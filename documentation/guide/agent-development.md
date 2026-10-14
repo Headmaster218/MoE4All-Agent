@@ -3,7 +3,7 @@ kind: guide
 status: current
 scope: agent-development
 last_verified: 2026-10-15
-baseline_tag: release-0.1.0-preview.1
+baseline_tag: release-0.1.0-preview.2
 ---
 
 # Agent 源码开发入口

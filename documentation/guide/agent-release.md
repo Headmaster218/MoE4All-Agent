@@ -33,8 +33,8 @@ CI 不下载大模型，也不宣称 GPU 推理已验收。最终模型对话属
 ## 本地构建
 
 ```powershell
-./harness/scripts/Build-AgentRelease.ps1 -Version release-0.1.0-preview.1
-./harness/scripts/Test-AgentRelease.ps1 -Archive ./artifacts/agent-release/MoE4All-Agent-Windows-x64-v0.1.0-preview.1.zip
+./harness/scripts/Build-AgentRelease.ps1 -Version release-0.1.0-preview.2
+./harness/scripts/Test-AgentRelease.ps1 -Archive ./artifacts/agent-release/MoE4All-Agent-Windows-x64-v0.1.0-preview.2.zip
 ```
 
 源码及子模块必须干净且匹配提交指针。不要把开发 profile、生产 DSH 数据或本机绝对路径复制进发行包。

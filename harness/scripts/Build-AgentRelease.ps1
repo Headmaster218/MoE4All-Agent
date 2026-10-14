@@ -155,6 +155,7 @@ if ($BaseArchive) {
     [IO.File]::WriteAllText($checksum, "$hash  $([IO.Path]::GetFileName($archive))`n", (New-Object Text.UTF8Encoding($false)))
     Write-Host "Agent release: $archive"
     Write-Host "SHA256: $hash"
+    $global:LASTEXITCODE = 0
     return
 }
 
@@ -449,3 +450,4 @@ $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvar
 [IO.File]::WriteAllText($checksum, "$hash  $([IO.Path]::GetFileName($archive))`n", (New-Object Text.UTF8Encoding($false)))
 Write-Host "Agent release: $archive"
 Write-Host "SHA256: $hash"
+$global:LASTEXITCODE = 0
