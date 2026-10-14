@@ -1,3 +1,2 @@
-/dev-state/
-/runtime/
-/logs/
+/artifacts/
+/harness/agent-state/

@@ -1,10 +1,19 @@
-# MoE4All Agent 源码入口
+# MoE4All Agent
 
-完整说明统一在 documentation：
+MoE4All Agent 是 MoE4All 的桌面 Agent 发行版，包含桌面壳、DSH、内置插件、
+首次启动引导和分层更新能力。推理引擎由独立的
+[MoE4All Engine](https://github.com/Headmaster218/MoE4All) 项目提供。
 
-- [当前产品架构](../documentation/architecture/product/agent-distribution.md)
-- [构建与隔离运行](../documentation/guide/agent-development.md)
-- [来源与本地改造迁移](../documentation/evidence/changes/product/dsh-source-and-local-migration.md)
-- [发行剩余工作](../documentation/roadmap/agent-distribution.md)
+当前 Agent 源码位于 `harness/`，其中 DSH 与内置插件以 Git submodule 固定版本。
+开发和构建说明见 [harness/README.md](harness/README.md) 与
+[Agent 开发指南](documentation/guide/agent-development.md)。
 
-请使用干净 Agent 初始化入口；旧 DevHarness 会复制本机设置与凭据，不适合制作公共发行物。
+## 获取源码
+
+```powershell
+git clone --recurse-submodules https://github.com/Headmaster218/MoE4All-Agent.git
+```
+
+## 许可证
+
+项目按 `LICENSE` 与 `LICENSE-MIT` 所列条款发布。各 submodule 适用其各自许可证。
