@@ -159,6 +159,7 @@ if ($BaseArchive) {
 }
 
 New-Item -ItemType Directory -Path $output, $stage -Force | Out-Null
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $temp = Join-Path $output "$name-source.zip"
 $agentPaths = @(
     'harness/distribution/profile',
@@ -178,14 +179,14 @@ $agentPaths = @(
 )
 & git -C $root archive '--format=zip' ("--output=$temp") HEAD @agentPaths
 if ($LASTEXITCODE -ne 0) { throw 'Archiving Agent scripts failed.' }
-Expand-Archive -LiteralPath $temp -DestinationPath $stage
+[IO.Compression.ZipFile]::ExtractToDirectory($temp, $stage)
 
 foreach ($relative in $submodules) {
     $source = Join-Path $root $relative
     $subArchive = Join-Path $output ("$name-" + ($relative -replace '[\\/]', '-') + '.zip')
     & git -C $source archive '--format=zip' ("--output=$subArchive") HEAD
     if ($LASTEXITCODE -ne 0) { throw "Archiving $relative failed." }
-    Expand-Archive -LiteralPath $subArchive -DestinationPath (Join-Path $stage $relative) -Force
+    [IO.Compression.ZipFile]::ExtractToDirectory($subArchive, (Join-Path $stage $relative))
     Remove-Item -LiteralPath $subArchive
 }
 Remove-Item -LiteralPath $temp

@@ -19,9 +19,9 @@ try {
     $env:DSH_CLIENT_TITLE = 'MoE4All Agent'
     $releaseManifest = Join-Path $harnessRoot 'distribution\agent-release.json'
     if (Test-Path -LiteralPath $releaseManifest -PathType Leaf) {
-        $release = Get-Content -LiteralPath $releaseManifest -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ([string]$release.dshCommit -notmatch '^[0-9a-f]{40}$') { throw 'Invalid DSH commit in Agent release manifest.' }
-        $env:DSH_CLIENT_COMMIT_HASH = [string]$release.dshCommit
+        $releaseInfo = Get-Content -LiteralPath $releaseManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ([string]$releaseInfo.dshCommit -notmatch '^[0-9a-f]{40}$') { throw 'Invalid DSH commit in Agent release manifest.' }
+        $env:DSH_CLIENT_COMMIT_HASH = [string]$releaseInfo.dshCommit
     }
     & (Join-Path $PSScriptRoot 'Build-DevHarness.ps1') -SkipInitialize -ProfileDir (Join-Path $state 'home\profiles\web') -Release:$Release -UpdateProfileLock:$UpdateProfileLock
 } finally {
