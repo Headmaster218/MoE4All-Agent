@@ -23,7 +23,7 @@ foreach ($dependency in @($core, $forms, (Join-Path $vendor 'WebView2Loader.dll'
 }
 $target = if ($Console) { 'exe' } else { 'winexe' }
 $nativeArgs = @(
-    '/nologo', ("/target:$target"), '/platform:x64', '/optimize+',
+    '/nologo', ("/target:$target"), '/platform:x64', '/optimize+', '/codepage:65001',
     '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
     ("/reference:$core"), ("/reference:$forms"),
     ('/resource:' + $startupPage + ',MoE4All.Startup.html'),

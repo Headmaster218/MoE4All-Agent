@@ -162,6 +162,8 @@ New-Item -ItemType Directory -Path $output, $stage -Force | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $temp = Join-Path $output "$name-source.zip"
 $agentPaths = @(
+    'LICENSE',
+    'LICENSE-MIT',
     'harness/distribution/profile',
     'harness/distribution/build-tools',
     'harness/distribution/runtime-versions.json',
@@ -192,6 +194,8 @@ foreach ($relative in $submodules) {
 Remove-Item -LiteralPath $temp
 
 $stageHarness = Join-Path $stage 'harness'
+New-Item -ItemType Directory -Path (Join-Path $stage 'licenses') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $stageHarness 'dsh\LICENSE') -Destination (Join-Path $stage 'licenses\DSH-MIT.txt')
 $dshCommit = (& git -C (Join-Path $root 'harness\dsh') rev-parse HEAD).Trim()
 $manifest = [ordered]@{
     schema = 2
