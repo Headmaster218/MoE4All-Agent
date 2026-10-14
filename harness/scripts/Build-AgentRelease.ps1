@@ -261,6 +261,8 @@ $node = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Filter n
 $pnpmCli = Join-Path $buildHarness 'runtime\pnpm\node_modules\pnpm\bin\pnpm.cjs'
 $pnpmStore = Join-Path $buildHarness 'runtime\pnpm-store'
 if (-not $node -or -not (Test-Path -LiteralPath $pnpmCli -PathType Leaf)) { throw 'The release build runtime is incomplete.' }
+& $node (Join-Path $PSScriptRoot 'Prepare-AgentDeploy.cjs') (Join-Path $buildHarness 'dsh')
+if ($LASTEXITCODE -ne 0) { throw 'Preparing the approved workspace helper build failed.' }
 Push-Location (Join-Path $buildHarness 'dsh')
 try {
     & $node $pnpmCli ("--config.store-dir=$pnpmStore") --config.inject-workspace-packages=true --config.node-linker=isolated --filter '@deepseek-ai/dsh' deploy --prod $deploy
@@ -268,6 +270,9 @@ try {
 } finally {
     Pop-Location
 }
+
+& $node (Join-Path $PSScriptRoot 'Test-AgentDeployLock.cjs') (Join-Path $buildHarness 'dsh') $deploy
+if ($LASTEXITCODE -ne 0) { throw 'DSH deployment escaped the fixed dependency lock.' }
 
 $deployRoot = [IO.Path]::GetFullPath($deploy).TrimEnd([IO.Path]::DirectorySeparatorChar)
 $buildDshRoot = [IO.Path]::GetFullPath((Join-Path $buildHarness 'dsh')).TrimEnd([IO.Path]::DirectorySeparatorChar)
