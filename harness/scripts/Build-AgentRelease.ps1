@@ -263,7 +263,7 @@ $pnpmStore = Join-Path $buildHarness 'runtime\pnpm-store'
 if (-not $node -or -not (Test-Path -LiteralPath $pnpmCli -PathType Leaf)) { throw 'The release build runtime is incomplete.' }
 Push-Location (Join-Path $buildHarness 'dsh')
 try {
-    & $node $pnpmCli ("--config.store-dir=$pnpmStore") --filter '@deepseek-ai/dsh' deploy --prod --legacy $deploy
+    & $node $pnpmCli ("--config.store-dir=$pnpmStore") --config.inject-workspace-packages=true --config.node-linker=isolated --filter '@deepseek-ai/dsh' deploy --prod $deploy
     if ($LASTEXITCODE -ne 0) { throw 'Creating the production DSH deployment failed.' }
 } finally {
     Pop-Location

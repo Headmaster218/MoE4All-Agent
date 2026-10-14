@@ -14,6 +14,8 @@ Agent 与 Engine 分别版本化。Agent Windows 包包含桌面壳、Node、DSH
 修改插件后先提交插件源码及 runtime，再运行 `harness/scripts/Build-Agent.ps1 -UpdateProfileLock`，审查并提交 profile lock。
 lock 维护会从插件的 Git commit 打包，避免工作区换行转换改变 tarball integrity。
 发布构建使用 `-Release` 与 frozen lock，不执行依赖自动升级。
+DSH 部署使用 pnpm shared-lockfile deploy（仅在部署阶段启用 workspace injection），
+从已检查的 workspace lock 生成冻结的部署 lock；不使用会重新解析依赖的 legacy deploy。
 
 ## 发布流程
 
