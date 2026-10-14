@@ -44,7 +44,9 @@ jobs:
           if ($env:GITHUB_REF_TYPE -ne 'tag' -and $env:GITHUB_REF_NAME -ne 'main') { throw 'Manual builds must use main.' }
           "tag=$tag" >> $env:GITHUB_OUTPUT
       - name: Build frozen desktop distribution
-        run: ./harness/scripts/Build-AgentRelease.ps1 -Version '${{ steps.version.outputs.tag }}'
+        run: |
+          ./harness/scripts/Test-AgentBuild.ps1
+          ./harness/scripts/Build-AgentRelease.ps1 -Version '${{ steps.version.outputs.tag }}'
       - name: Run bootstrap and updater regression tests
         run: |
           $ErrorActionPreference = 'Stop'
