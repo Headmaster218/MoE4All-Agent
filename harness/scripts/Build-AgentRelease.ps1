@@ -177,14 +177,14 @@ $agentPaths = @(
     'harness/scripts/vendor',
     'harness/scripts/Run-Agent.ps1'
 )
-& git -C $root archive '--format=zip' ("--output=$temp") HEAD @agentPaths
+& git -c core.autocrlf=false -C $root archive '--format=zip' ("--output=$temp") HEAD @agentPaths
 if ($LASTEXITCODE -ne 0) { throw 'Archiving Agent scripts failed.' }
 [IO.Compression.ZipFile]::ExtractToDirectory($temp, $stage)
 
 foreach ($relative in $submodules) {
     $source = Join-Path $root $relative
     $subArchive = Join-Path $output ("$name-" + ($relative -replace '[\\/]', '-') + '.zip')
-    & git -C $source archive '--format=zip' ("--output=$subArchive") HEAD
+    & git -c core.autocrlf=false -C $source archive '--format=zip' ("--output=$subArchive") HEAD
     if ($LASTEXITCODE -ne 0) { throw "Archiving $relative failed." }
     [IO.Compression.ZipFile]::ExtractToDirectory($subArchive, (Join-Path $stage $relative))
     Remove-Item -LiteralPath $subArchive

@@ -7,12 +7,14 @@ Agent 与 Engine 分别版本化。Agent Windows 包包含桌面壳、Node、DSH
 
 - `harness/distribution/runtime-versions.json` 固定 Node、pnpm、registry 和 Node ZIP SHA256。
 - `harness/distribution/build-tools/package-lock.json` 固定 pnpm 安装包及 integrity。
-- DSH 使用子模块内的 `pnpm-lock.yaml`；Provider 使用子模块内的 `package-lock.json`。
+- DSH 使用子模块内的 `pnpm-lock.yaml`；Provider 的源码开发使用子模块内的 `package-lock.json`。
 - 内置插件固定为 Git submodule commit；profile 使用 `harness/distribution/profile/pnpm-lock.yaml`。
 - Actions 使用完整 commit SHA，Windows runner 使用 `windows-2025`。托管 runner 镜像本身会更新，不是位级固定。
 
 修改插件后先提交插件源码及 runtime，再运行 `harness/scripts/Build-Agent.ps1 -UpdateProfileLock`，审查并提交 profile lock。
-lock 维护会从插件的 Git commit 打包，避免工作区换行转换改变 tarball integrity。
+lock 维护会从插件的 Git commit 打包，明确关闭 Git archive 的 autocrlf 转换。
+发行包使用子模块里已提交、验收过的插件 runtime，不在发行阶段重新生成 sourcemap；
+修改插件时需先完成源码构建和测试，再提交 runtime 与源码。
 发布构建使用 `-Release` 与 frozen lock，不执行依赖自动升级。
 DSH 部署使用 pnpm shared-lockfile deploy（仅在部署阶段启用 workspace injection），
 从已检查的 workspace lock 生成冻结的部署 lock；不使用会重新解析依赖的 legacy deploy。

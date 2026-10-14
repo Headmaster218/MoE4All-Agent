@@ -85,6 +85,9 @@ try {
         Pop-Location
     }
 
+    # Release plugin runtimes are committed and pinned with their source submodules.
+    # Rebuilding sourcemaps here would make tarball integrity depend on the checkout.
+    if (-not $Release) {
     $providerPath = Join-Path $harnessRoot 'plugins\dsh-llm-moe4all'
     Push-Location $providerPath
     try {
@@ -95,6 +98,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Building the MoE4All provider plugin failed.' }
     } finally {
         Pop-Location
+    }
     }
 
     New-Item -ItemType Directory -Path $pluginPackRoot -Force | Out-Null
@@ -115,7 +119,7 @@ try {
             throw "Plugin source is missing a package manifest: $pluginPath"
         }
 
-        if ($pluginName -eq 'dsh-mneme-moe4all') {
+        if ($pluginName -eq 'dsh-mneme-moe4all' -and -not $Release) {
             & $node (Join-Path $pluginPath 'scripts\sync-lib.js')
             if ($LASTEXITCODE -ne 0) { throw 'Syncing Mneme source into its runtime failed.' }
         }
@@ -126,7 +130,7 @@ try {
             if ($LASTEXITCODE -ne 0) { throw "Commit plugin source/runtime changes before updating the profile lock: $pluginName" }
             $sourceArchive = Join-Path $pluginPackRoot "$pluginName-source.zip"
             $packSource = Join-Path $pluginPackRoot ("source-" + $pluginName + '-' + [guid]::NewGuid().ToString('N'))
-            & git -C $pluginPath archive '--format=zip' "--output=$sourceArchive" HEAD
+            & git -c core.autocrlf=false -C $pluginPath archive '--format=zip' "--output=$sourceArchive" HEAD
             if ($LASTEXITCODE -ne 0) { throw "Cannot archive the fixed plugin source: $pluginName" }
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             [IO.Compression.ZipFile]::ExtractToDirectory($sourceArchive, $packSource)
