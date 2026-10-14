@@ -11,7 +11,8 @@ Agent 与 Engine 分别版本化。Agent Windows 包包含桌面壳、Node、DSH
 - 内置插件固定为 Git submodule commit；profile 使用 `harness/distribution/profile/pnpm-lock.yaml`。
 - Actions 使用完整 commit SHA，Windows runner 使用 `windows-2025`。托管 runner 镜像本身会更新，不是位级固定。
 
-修改插件后运行 `harness/scripts/Build-Agent.ps1 -UpdateProfileLock`，审查并提交 profile lock。
+修改插件后先提交插件源码及 runtime，再运行 `harness/scripts/Build-Agent.ps1 -UpdateProfileLock`，审查并提交 profile lock。
+lock 维护会从插件的 Git commit 打包，避免工作区换行转换改变 tarball integrity。
 发布构建使用 `-Release` 与 frozen lock，不执行依赖自动升级。
 
 ## 发布流程

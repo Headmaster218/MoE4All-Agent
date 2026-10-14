@@ -225,6 +225,15 @@ if ($PrebuiltHarnessRoot) {
     if ($builtCommit -ne $dshCommit) {
         throw "Prebuilt DSH commit does not match the release pin: $builtCommit"
     }
+    if ($prebuiltManifest.profileLockSha256 -ne $manifest.profileLockSha256 -or
+        $prebuiltManifest.runtimeVersions.node -ne $manifest.runtimeVersions.node -or
+        $prebuiltManifest.runtimeVersions.pnpm -ne $manifest.runtimeVersions.pnpm) {
+        throw 'Prebuilt runtime versions or profile dependency lock differ from the release.'
+    }
+    foreach ($pin in $manifest.submodules) {
+        $builtPin = @($prebuiltManifest.submodules | Where-Object { $_.path -eq $pin.path })
+        if ($builtPin.Count -ne 1 -or $builtPin[0].commit -ne $pin.commit) { throw "Prebuilt submodule differs from release: $($pin.path)" }
+    }
     & (Join-Path $stageHarness 'scripts\Initialize-Agent.ps1') -StateRoot (Join-Path $stageHarness 'agent-state')
     $builtProfile = Join-Path $buildHarness 'agent-state\home\profiles\web'
     $stageProfile = Join-Path $stageHarness 'agent-state\home\profiles\web'

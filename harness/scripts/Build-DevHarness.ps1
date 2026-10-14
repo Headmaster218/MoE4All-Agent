@@ -120,7 +120,18 @@ try {
             if ($LASTEXITCODE -ne 0) { throw 'Syncing Mneme source into its runtime failed.' }
         }
 
-        $packOutput = & $node $npmCli pack $pluginPath --pack-destination $pluginPackRoot --ignore-scripts --json
+        $packSource = $pluginPath
+        if ($UpdateProfileLock) {
+            & git -C $pluginPath diff --quiet HEAD
+            if ($LASTEXITCODE -ne 0) { throw "Commit plugin source/runtime changes before updating the profile lock: $pluginName" }
+            $sourceArchive = Join-Path $pluginPackRoot "$pluginName-source.zip"
+            $packSource = Join-Path $pluginPackRoot ("source-" + $pluginName + '-' + [guid]::NewGuid().ToString('N'))
+            & git -C $pluginPath archive '--format=zip' "--output=$sourceArchive" HEAD
+            if ($LASTEXITCODE -ne 0) { throw "Cannot archive the fixed plugin source: $pluginName" }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [IO.Compression.ZipFile]::ExtractToDirectory($sourceArchive, $packSource)
+        }
+        $packOutput = & $node $npmCli pack $packSource --pack-destination $pluginPackRoot --ignore-scripts --json
         if ($LASTEXITCODE -ne 0) { throw "Packing $pluginName failed." }
         $pack = ($packOutput -join [Environment]::NewLine) | ConvertFrom-Json
         $generatedPack = Join-Path $pluginPackRoot $pack.filename
@@ -137,7 +148,7 @@ try {
             Copy-Item -LiteralPath $stablePack -Destination $contentPack
         }
         if ($Release -or $UpdateProfileLock) {
-            $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName.tgz"
+            $packedDependencies[$pluginName] = "file:..\..\..\..\runtime\plugin-packs\$pluginName.tgz"
         } else {
             $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName-$digest.tgz"
         }

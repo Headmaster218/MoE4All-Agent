@@ -77,7 +77,7 @@ packages:
       react: ^18.2.0
 
   dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz:
-    resolution: {integrity: sha512-RBRdHqOajCDN2cskCUatIuAtq9zA8xuSRlwJRGlLXmixDA/hxJ675EO13CdMciWHSr6c3b+VaQzLKsQzgkA6SA==, tarball: file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz}
+    resolution: {integrity: sha512-dJmrsWosd5kxoPBaeEHPy0H3h8FxvcJoUR7MD69Mpb8td9tDMNU2ZcqONHrfgzKNbWpuHJjxME5m9cThFA0kRw==, tarball: file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz}
     version: 1.45.1-moe4all.1
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
@@ -123,7 +123,7 @@ packages:
       react: ^18.2.0
 
   dsh-remote-web-ui-moe4all@file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz:
-    resolution: {integrity: sha512-225cx0SOfEZ+rrzqnOEXBNa6xFtCmMUyV+wxTH8xnjCWEBO38jpSAnTJ4OrxXgQ6Ju/EOu2IhuYAulR5q9ShOw==, tarball: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz}
+    resolution: {integrity: sha512-vFMpQihOA06HzkSd4rHesynBhiT0Z3xTYP0OWgjEZE4geHbkC4wGi6VAISt5xew7aIcA48xnspOabrqq07IsIg==, tarball: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz}
     version: 0.3.17-moe4all.1
     engines: {node: ^22.19.0 || >=24.0.0}
     peerDependencies:
