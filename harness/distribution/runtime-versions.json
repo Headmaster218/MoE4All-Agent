@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "node": "24.9.0",
+  "nodeWindowsX64Sha256": "6873514c3e6a012917cc6f95ce48a6289253370d025f1b69db290d70feebfa6e",
+  "pnpm": "11.7.0",
+  "registry": "https://registry.npmjs.org"
+}

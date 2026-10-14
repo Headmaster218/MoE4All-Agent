@@ -1,6 +1,11 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'AgentUpdateVersion.ps1')
 $cases = @(
+    @('release-0.1.0-preview.2', 'release-0.1.0-preview.1', $true),
+    @('release-0.1.0', 'release-0.1.0-preview.2', $true),
+    @('release-0.1.0-preview.3', 'release-0.1.0', $false),
+    @('release-0.1.0-preview.1', 'release-0.1.0-preview.1', $false),
+    @('release-0.1.0-preview.10', 'release-0.1.0-preview.2', $true),
     @('agent-v0.1.0-preview.2', 'agent-v0.1.0-preview.1', $true),
     @('agent-v0.1.0', 'agent-v0.1.0-preview.2', $true),
     @('agent-v0.1.0-preview.3', 'agent-v0.1.0', $false),

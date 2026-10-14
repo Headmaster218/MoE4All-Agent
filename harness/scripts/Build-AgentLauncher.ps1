@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if (-not $OutputPath) { $OutputPath = Join-Path $root 'MoE4All.exe' }
 $source = Join-Path $root 'harness\launcher\MoE4All.cs'
+$startupPage = Join-Path $root 'harness\launcher\Startup.html'
 $manifest = Join-Path $root 'harness\launcher\MoE4All.exe.manifest'
 $config = Join-Path $root 'harness\launcher\MoE4All.exe.config'
 $vendor = Join-Path $root 'harness\launcher\vendor\webview2'
@@ -23,8 +24,9 @@ foreach ($dependency in @($core, $forms, (Join-Path $vendor 'WebView2Loader.dll'
 $target = if ($Console) { 'exe' } else { 'winexe' }
 $nativeArgs = @(
     '/nologo', ("/target:$target"), '/platform:x64', '/optimize+',
-    '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll',
+    '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
     ("/reference:$core"), ("/reference:$forms"),
+    ('/resource:' + $startupPage + ',MoE4All.Startup.html'),
     ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source
 )
 & $compiler @nativeArgs

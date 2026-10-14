@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
     [Parameter(Mandatory = $true)][int]$ParentPid,
     [ValidateSet('Legacy', 'Check', 'Install')][string]$Action = 'Legacy',
-    [string]$FeedUri = 'https://api.github.com/repos/Headmaster218/MoE4All/releases?per_page=30',
+    [string]$FeedUri = 'https://api.github.com/repos/Headmaster218/MoE4All-Agent/releases?per_page=30',
     [string]$TestArchive,
     [string]$TestRoot,
     [switch]$TestInstallOnly
@@ -120,10 +120,11 @@ $sumAsset = $null
 if ($Action -ne 'Legacy') { Write-UpdateStatus 'checking' 0 0 'Checking for updates' }
 if ($testMode) {
     $zipName = [IO.Path]::GetFileName($testZip)
-    if ($zipName -notmatch '^MoE4All-Agent-Windows-x64-(agent-v[0-9]+\.[0-9]+\.[0-9]+(?:-preview\.[0-9]+)?)\.zip$') {
+    if ($zipName -notmatch '^MoE4All-Agent-Windows-x64-((?:agent-)?v[0-9]+\.[0-9]+\.[0-9]+(?:-preview\.[0-9]+)?)\.zip$') {
         throw 'Test archive name is not an Agent release asset.'
     }
     $tag = $Matches[1]
+    if ($tag.StartsWith('v')) { $tag = 'release-' + $tag.Substring(1) }
     if (-not (Test-AgentVersionNewer $tag ([string]$installed.version))) { throw 'Test archive is not newer.' }
     $best = @{ tag_name = $tag }
     $zipAsset = @{ name = $zipName }
@@ -140,7 +141,8 @@ if ($testMode) {
         $tag = [string]$release.tag_name
         if ($release.draft -eq $true -or -not (Test-AgentVersionNewer $tag ([string]$installed.version))) { continue }
         if ($null -ne $best -and -not (Test-AgentVersionNewer $tag ([string]$best.tag_name))) { continue }
-        $zipName = "MoE4All-Agent-Windows-x64-$tag.zip"
+        $assetVersion = if ($tag.StartsWith('release-')) { 'v' + $tag.Substring(8) } else { $tag }
+        $zipName = "MoE4All-Agent-Windows-x64-$assetVersion.zip"
         $zip = @($release.assets | Where-Object name -eq $zipName | Select-Object -First 1)[0]
         $sum = @($release.assets | Where-Object name -eq "$zipName.sha256" | Select-Object -First 1)[0]
         if ($null -eq $zip -or $null -eq $sum) { continue }
@@ -148,7 +150,7 @@ if ($testMode) {
             $zipUri = [Uri]$zip.browser_download_url
             $sumUri = [Uri]$sum.browser_download_url
         } catch { continue }
-        $prefix = "/Headmaster218/MoE4All/releases/download/$tag/"
+        $prefix = "/Headmaster218/MoE4All-Agent/releases/download/$tag/"
         if ($zipUri.Scheme -ne 'https' -or $sumUri.Scheme -ne 'https' -or
             $zipUri.Host -ne 'github.com' -or $sumUri.Host -ne 'github.com' -or
             -not $zipUri.AbsolutePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or

@@ -1,17 +1,22 @@
 [CmdletBinding()]
 param(
     [string]$NodeVersion = '24.9.0',
-    [string]$Registry = 'https://registry.npmmirror.com',
+    [string]$Registry = 'https://registry.npmjs.org',
     [string]$ProductionHome = "$env:APPDATA\dsh-desktop\harness",
     [string]$WorkspaceRoot = "$env:USERPROFILE\Documents\DSH",
     [switch]$RefreshConfig,
     [switch]$SkipInitialize,
-    [string]$ProfileDir
+    [string]$ProfileDir,
+    [switch]$Release,
+    [switch]$UpdateProfileLock
 )
 
 $ErrorActionPreference = 'Stop'
 
 $harnessRoot = Split-Path -Parent $PSScriptRoot
+$versions = Get-Content -LiteralPath (Join-Path $harnessRoot 'distribution\runtime-versions.json') -Raw | ConvertFrom-Json
+if ($NodeVersion -ne $versions.node -or $Registry -ne $versions.registry) { throw 'Runtime overrides must match runtime-versions.json.' }
+if ($Release -and $UpdateProfileLock) { throw 'Release builds cannot update dependency locks.' }
 $dshRoot = Join-Path $harnessRoot 'dsh'
 $runtimeRoot = Join-Path $harnessRoot 'runtime'
 $nodeFolder = "node-v$NodeVersion-win-x64"
@@ -36,24 +41,30 @@ if (-not $SkipInitialize) {
     throw "Isolated profile is not initialized: $devProfile"
 }
 
-if (-not (Test-Path -LiteralPath $node)) {
-    New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-    $archive = Join-Path $runtimeRoot "$nodeFolder.zip"
-    if (-not (Test-Path -LiteralPath $archive)) {
-        $uri = "https://nodejs.org/dist/v$NodeVersion/$nodeFolder.zip"
-        Write-Host "Downloading $uri"
-        Invoke-WebRequest -Uri $uri -OutFile $archive
-    }
-    Expand-Archive -LiteralPath $archive -DestinationPath $runtimeRoot -Force
+New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
+$archive = Join-Path $runtimeRoot "$nodeFolder.zip"
+if (-not (Test-Path -LiteralPath $archive)) {
+    $uri = "https://nodejs.org/dist/v$NodeVersion/$nodeFolder.zip"
+    Write-Host "Downloading $uri"
+    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $archive
 }
-if (-not (Test-Path -LiteralPath $node)) { throw "Node runtime not found after extraction: $node" }
+if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $versions.nodeWindowsX64Sha256) {
+    throw 'Node archive SHA256 does not match the pinned runtime.'
+}
+if (-not (Test-Path -LiteralPath $node)) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($archive, $runtimeRoot)
+}
+if ((& $node --version) -ne "v$NodeVersion") { throw 'Unexpected Node runtime version.' }
 if (-not (Test-Path -LiteralPath $npmCli)) { throw "npm CLI not found in Node runtime: $npmCli" }
 
-if (-not (Test-Path -LiteralPath $pnpmCli)) {
-    New-Item -ItemType Directory -Path $pnpmRoot -Force | Out-Null
-    & $node $npmCli install --prefix $pnpmRoot --registry $Registry --no-audit --no-fund 'pnpm@11.7.0'
-    if ($LASTEXITCODE -ne 0) { throw 'Installing the isolated pnpm runtime failed.' }
+New-Item -ItemType Directory -Path $pnpmRoot -Force | Out-Null
+foreach ($file in @('package.json', 'package-lock.json')) {
+    Copy-Item -LiteralPath (Join-Path $harnessRoot "distribution\build-tools\$file") -Destination (Join-Path $pnpmRoot $file) -Force
 }
+& $node $npmCli ci --prefix $pnpmRoot --registry $Registry --no-audit --no-fund --ignore-scripts
+if ($LASTEXITCODE -ne 0) { throw 'Installing the locked pnpm runtime failed.' }
+if ((& $node $pnpmCli --version) -ne $versions.pnpm) { throw 'Unexpected pnpm runtime version.' }
 
 $oldCi = $env:CI
 $oldPath = $env:PATH
@@ -125,7 +136,11 @@ try {
         if (-not (Test-Path -LiteralPath $contentPack -PathType Leaf)) {
             Copy-Item -LiteralPath $stablePack -Destination $contentPack
         }
-        $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName-$digest.tgz"
+        if ($Release -or $UpdateProfileLock) {
+            $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName.tgz"
+        } else {
+            $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName-$digest.tgz"
+        }
     }
 
     $manifestPath = Join-Path $devProfile 'package.json'
@@ -135,24 +150,21 @@ try {
     }
     [System.IO.File]::WriteAllText($manifestPath, (($manifest | ConvertTo-Json -Depth 12) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
 
+    $canonicalLock = Join-Path $harnessRoot 'distribution\profile\pnpm-lock.yaml'
+    if ($Release) {
+        if (-not (Test-Path -LiteralPath $canonicalLock)) { throw 'The checked-in profile dependency lock is missing.' }
+        Copy-Item -LiteralPath $canonicalLock -Destination (Join-Path $devProfile 'pnpm-lock.yaml') -Force
+    }
     Push-Location $devProfile
     try {
-        & $node $pnpmCli "--config.registry=$Registry" install --no-frozen-lockfile --store-dir $pnpmStore --fetch-timeout 300000 --fetch-retries 5
+        $lockOption = if ($Release) { '--frozen-lockfile' } else { '--no-frozen-lockfile' }
+        & $node $pnpmCli "--config.registry=$Registry" install $lockOption --store-dir $pnpmStore --fetch-timeout 300000 --fetch-retries 5
         if ($LASTEXITCODE -ne 0) { throw 'Installing the isolated web profile failed.' }
-
-        # Local tarballs keep stable filenames. Refresh their lockfile integrity
-        # explicitly so a rebuilt package cannot leave stale bytes installed.
-        $updateArgs = @("--config.registry=$Registry", 'update') + $pluginNames + @(
-            '--force'
-            '--store-dir'
-            $pnpmStore
-            '--fetch-timeout'
-            '300000'
-            '--fetch-retries'
-            '5'
-        )
-        & $node $pnpmCli @updateArgs
-        if ($LASTEXITCODE -ne 0) { throw 'Refreshing the isolated local plugin packages failed.' }
+        if ($UpdateProfileLock) {
+            & $node $pnpmCli "--config.registry=$Registry" update @pluginNames --force --store-dir $pnpmStore
+            if ($LASTEXITCODE -ne 0) { throw 'Updating the profile dependency lock failed.' }
+            Copy-Item -LiteralPath (Join-Path $devProfile 'pnpm-lock.yaml') -Destination $canonicalLock -Force
+        }
     } finally {
         Pop-Location
     }

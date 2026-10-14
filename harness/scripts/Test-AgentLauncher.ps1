@@ -105,15 +105,20 @@ if ($success.ExitCode -ne 0 -or $success.Output -notmatch 'prepare-ok' -or $succ
     throw "Downloaded-script/module-path launch failed: $($success.Output)"
 }
 
-$windowedLauncher = Join-Path $fixtureRoot 'MoE4All-windowed.exe'
+$windowedLauncher = $launcher
 $builtWindowedLauncher = Join-Path $buildRoot 'MoE4All-windowed.exe'
 & (Join-Path $PSScriptRoot 'Build-AgentLauncher.ps1') -OutputPath $builtWindowedLauncher
 [IO.File]::Copy($builtWindowedLauncher, $windowedLauncher, $true)
 [IO.File]::Copy(($builtWindowedLauncher + '.config'), ($windowedLauncher + '.config'), $true)
-$windowed = Start-Process -FilePath $windowedLauncher -ArgumentList '--no-pause' -WorkingDirectory $fixtureRoot -PassThru -Wait
+$windowed = Start-Process -FilePath $windowedLauncher -ArgumentList '--no-pause' -WorkingDirectory $fixtureRoot -WindowStyle Hidden -PassThru
+if (-not $windowed.WaitForExit(60000)) {
+    $windowed.Kill()
+    throw 'The windowed fixture launcher exceeded its timeout.'
+}
 if ($windowed.ExitCode -ne 0) {
     throw "Windowed launcher failed without a console handle: exit $($windowed.ExitCode)"
 }
+[IO.File]::Copy($builtLauncher, $launcher, $true)
 
 Write-FixtureScript 'Prepare-BundledRuntime.ps1' @'
 param([string]$InstallRoot, [string]$StateRoot)

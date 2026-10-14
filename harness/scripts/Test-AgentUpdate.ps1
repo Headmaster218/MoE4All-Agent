@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$OutputDirectory)
+param([string]$OutputDirectory, [switch]$LegacyTags)
 
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -42,7 +42,7 @@ function Write-App([string]$Root, [string]$Version) {
 }
 
 function Write-Archive([string]$Version) {
-    $name = "MoE4All-Agent-Windows-x64-$Version"
+    $name = "MoE4All-Agent-Windows-x64-$($Version -replace '^release-', 'v')"
     $source = Join-Path $testRoot $name
     Write-App $source $Version
     $archive = Join-Path $testRoot "$name.zip"
@@ -54,23 +54,24 @@ function Write-Archive([string]$Version) {
 }
 
 New-Item -ItemType Directory -Path $install -Force | Out-Null
-Write-App $install 'agent-v0.10.0-preview.1'
+$prefix = if ($LegacyTags) { 'agent-v0.10.0' } else { 'release-0.1.0' }
+Write-App $install "$prefix-preview.1"
 foreach ($directory in @('data', 'models', 'cache')) {
     Write-Text (Join-Path $install "$directory\sentinel.txt") "$directory-stays"
 }
-$preview2 = Write-Archive 'agent-v0.10.0-preview.2'
-$preview3 = Write-Archive 'agent-v0.10.0-preview.3'
+$preview2 = Write-Archive "$prefix-preview.2"
+$preview3 = Write-Archive "$prefix-preview.3"
 
 $oldGuard = $env:MOE4ALL_AGENT_UPDATE_TEST
 try {
     $env:MOE4ALL_AGENT_UPDATE_TEST = '1'
     $updater = Join-Path $install 'harness\scripts\Check-AgentUpdate.ps1'
     $checkOutput = @(& $updater -InstallRoot $install -ParentPid $PID -Action Check -TestArchive $preview2 -TestRoot $testRoot)
-    if (($checkOutput -join "`n") -notmatch '@@MOE4ALL_UPDATE\s+available\s+0\s+[1-9][0-9]*\s+agent-v0\.10\.0-preview\.2') {
+    if (($checkOutput -join "`n") -notmatch ('@@MOE4ALL_UPDATE\s+available\s+0\s+[1-9][0-9]*\s+' + [regex]::Escape("$prefix-preview.2"))) {
         throw "Manual update check did not report the available package: $($checkOutput -join ' | ')"
     }
     $stillInstalled = Get-Content -LiteralPath (Join-Path $install 'harness\distribution\agent-release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($stillInstalled.version -ne 'agent-v0.10.0-preview.1') { throw 'Check-only mode changed the installed application.' }
+    if ($stillInstalled.version -ne "$prefix-preview.1") { throw 'Check-only mode changed the installed application.' }
 
     $preview2Output = @(& $updater -InstallRoot $install -ParentPid $PID -TestArchive $preview2 -TestRoot $testRoot -TestInstallOnly)
     $preview2Text = $preview2Output -join "`n"
@@ -86,7 +87,7 @@ try {
 
 $current = Get-Content -LiteralPath (Join-Path $install 'harness\distribution\agent-release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $previous = Get-Content -LiteralPath (Join-Path $install 'updates\previous\harness\distribution\agent-release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($current.version -ne 'agent-v0.10.0-preview.3' -or $previous.version -ne 'agent-v0.10.0-preview.2') {
+if ($current.version -ne "$prefix-preview.3" -or $previous.version -ne "$prefix-preview.2") {
     throw "Rolling versions are wrong: current=$($current.version), previous=$($previous.version)"
 }
 foreach ($directory in @('data', 'models', 'cache')) {

@@ -1,5 +1,7 @@
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -13,6 +15,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
+using System.Web.Script.Serialization;
+using Microsoft.Win32;
+using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -27,6 +32,124 @@ internal static class MoE4All
     private static StreamWriter log;
     private static string logPath;
     private static AgentWindow window;
+
+    private static class Presentation
+    {
+        public static string Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" ? "zh" : "en";
+        public static string Theme = "gray";
+        public static string Preference = "gray";
+        public static string DarkPreference = "gray";
+        private static readonly Dictionary<string, string[]> Copy = new Dictionary<string, string[]>();
+
+        static Presentation()
+        {
+            Add("启动中", "Starting"); Add("已就绪", "Ready"); Add("需要处理", "Needs attention");
+            Add("在浏览器中打开", "Open in browser"); Add("检查更新", "Check updates");
+            Add("发现更新", "Update available"); Add("更新中...", "Updating..."); Add("检查中...", "Checking...");
+            Add("首次启动", "FIRST LAUNCH"); Add("MOE4ALL AGENT  /  首次启动", "MOE4ALL AGENT  /  FIRST LAUNCH"); Add("专家正在登机", "Experts are boarding");
+            Add("正在唤醒你的 Agent", "Waking up your Agent");
+            Add("这是第一次启动。MoE4All 正在准备 Agent 运行时、内置插件和独立工作区。只需一次，完成后会自动进入。", "Welcome to MoE4All. We are preparing the Agent runtime, built-in plugins and your workspace. This happens once; the Agent opens when everything is ready.");
+            Add("正在连接本地运行时、内置插件和工作区，很快就好。", "Connecting your local runtime, plugins and workspace. Almost there.");
+            Add("正在核验登机清单", "Checking the boarding list"); Add("正在检查本地运行时", "Checking the local runtime");
+            Add("准备中", "Preparing"); Add("运行时、插件与工作区将在本机完成准备。", "Preparing the runtime, plugins and workspace on this computer.");
+            Add("正在复用已经准备好的本地资源。", "Reusing your prepared local resources.");
+            Add("启动详情", "Startup details"); Add("查看启动详情", "Show startup details"); Add("收起启动详情", "Hide startup details");
+            Add("专家抵达后，后续启动会直接复用这套本地环境。", "Once the experts arrive, future launches reuse this local environment.");
+            Add("本地环境已就位，正在等待 Agent 响应。", "The local environment is ready. Waiting for the Agent.");
+            Add("安装 WebView2 运行时", "Install WebView2 Runtime"); Add("打开启动日志", "Open startup log");
+            Add("正在连接插件与工作区", "Connecting plugins and workspace"); Add("Agent 即将醒来", "Your Agent is almost awake");
+            Add("运行时正在装舱", "Loading the runtime onboard"); Add("专家正在飞往本地工作区", "Experts are flying to your workspace");
+            Add("即将抵达，正在整理最后一排座位", "Almost there. Making room for the last few experts"); Add("专家即将落地", "Experts are about to land");
+            Add("正在准备本地运行时。", "Preparing the local runtime."); Add("正在核验整合包中的运行时文件。", "Verifying the bundled runtime files.");
+            Add("正在解压运行时、内置插件与工作区模板。", "Unpacking the runtime, plugins and workspace template.");
+            Add("本地运行时已经准备完成。", "The local runtime is ready.");
+            Add("专家已落地，正在唤醒 Agent", "The experts have landed. Waking up your Agent");
+            Add("本地环境就绪，正在唤醒 Agent", "Local environment ready. Waking up your Agent");
+            Add("正在启动桌面界面与本地服务。", "Starting the desktop interface and local services.");
+            Add("启动遇到问题", "Startup needs attention"); Add("MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。", "MoE4All could not continue. The details below explain what happened. Resolve the issue and restart.");
+            Add("需要处理后再继续", "Resolve the issue to continue"); Add("已停止", "Stopped");
+            Add("MoE4All Agent 更新", "MoE4All Agent updates"); Add("Agent 更新", "Agent updates"); Add("已安装  ", "Installed  ");
+            Add("可以检查更新", "Ready to check"); Add("检查 GitHub 上是否有更新的 MoE4All Agent。", "Check GitHub for a newer MoE4All Agent package.");
+            Add("查看发布页面", "View release page"); Add("检查更新", "Check for updates"); Add("关闭", "Close");
+            Add("正在检查更新", "Checking for updates"); Add("正在连接 MoE4All 官方发布源。", "Contacting the official MoE4All release feed.");
+            Add("正在检查版本信息", "Checking release information"); Add("已是最新版本", "You're up to date");
+            Add(" 是当前最新的 Agent 版本。", " is the newest available Agent version."); Add("无需更新", "No update is required");
+            Add("再次检查", "Check again"); Add(" 可更新", " is available");
+            Add("仅替换应用文件。模型、对话和缓存留在原处；保留上一个版本用于回退。", "Download and replace application files only. Models, conversations and caches stay in place; one previous version is kept for rollback.");
+            Add("整包大小  ", "Package size  "); Add("可以开始下载", "Ready to download"); Add("下载并安装", "Download and install"); Add("暂不更新", "Not now");
+            Add("正在下载更新", "Downloading update"); Add("下载期间可以继续使用 MoE4All Agent。", "MoE4All Agent remains usable while the package downloads."); Add("请稍候", "Please wait");
+            Add("正在校验下载", "Verifying download"); Add("修改应用文件前，先校验安装包的 SHA-256。", "Checking the package SHA-256 before any application files are changed.");
+            Add("正在准备更新", "Preparing update"); Add("正在当前版本旁解压并验证新版本。", "Unpacking and validating the new application beside the current version.");
+            Add("正在安装并重启", "Installing and restarting"); Add("Agent 窗口会短暂关闭，切换版本后自动重新打开。", "The Agent window will close briefly, switch versions, and reopen automatically.");
+            Add("开始更新", "Starting update"); Add("正在准备应用更新。", "Preparing a secure application-only update.");
+            Add("更新需要处理", "Update needs attention"); Add("未替换任何应用文件", "No application files were replaced"); Add("重试", "Try again");
+            Add("选择 MoE4All 工作区目录", "Select a MoE4All workspace directory");
+            Add("选择 MoE4All GGUF 模型", "Select a MoE4All GGUF model");
+            Add("选择 MoE4All 引擎安装包或 infr.exe", "Select a MoE4All engine package or infr.exe");
+            Add("GGUF 模型 (*.gguf)|*.gguf|所有文件 (*.*)|*.*", "GGUF model (*.gguf)|*.gguf|All files (*.*)|*.*");
+            Add("森林绿", "Forest"); Add("黑色", "Black"); Add("灰色", "Gray"); Add("白色", "White");
+            Add("确定", "OK");
+            Add("此 Windows 会话中已有 MoE4All Agent 正在运行。", "MoE4All Agent is already running in this Windows session.");
+            Add("此开发预览未包含整包更新器，请使用完整的 MoE4All Agent 安装包。", "The bundled updater is unavailable. Reinstall the complete MoE4All Agent package.");
+        }
+
+        private static void Add(string zh, string en)
+        {
+            string[] pair = { zh, en };
+            Copy[zh] = pair; Copy[en] = pair;
+        }
+
+        public static string Translate(string source)
+        {
+            string[] pair;
+            if (Copy.TryGetValue(source, out pair)) return pair[Language == "zh" ? 0 : 1];
+            foreach (KeyValuePair<string, string[]> entry in Copy)
+            {
+                if (source.StartsWith(entry.Key, StringComparison.Ordinal))
+                    return entry.Value[Language == "zh" ? 0 : 1] + source.Substring(entry.Key.Length);
+                if (source.EndsWith(entry.Key, StringComparison.Ordinal))
+                    return source.Substring(0, source.Length - entry.Key.Length) + entry.Value[Language == "zh" ? 0 : 1];
+            }
+            return source;
+        }
+
+        public static void SetCopy(Control control, string source)
+        {
+            control.Tag = source;
+            control.Text = Translate(source);
+        }
+
+        public static Color ColorFor(string role)
+        {
+            bool light = Theme == "white";
+            if (role == "error") return ColorTranslator.FromHtml(light ? "#ad343b" : "#f5a3aa");
+            if (role == "success") return ColorTranslator.FromHtml(light ? "#2d6e4b" : "#a6d6b7");
+            string[] palette = Theme == "green" ? new string[] { "#1e201e", "#252a26", "#e5ece5", "#bdc9bf", "#afbeb2", "#829487", "#b8d2bf", "#243b2b" }
+                : Theme == "black" ? new string[] { "#101112", "#18191b", "#f1f2f3", "#bec1c5", "#a6abb2", "#69737f", "#e5e7eb", "#15171a" }
+                : light ? new string[] { "#fafbfc", "#ffffff", "#24282d", "#58616b", "#59636e", "#7a8692", "#344b5e", "#ffffff" }
+                : new string[] { "#1e1e1f", "#242426", "#ededee", "#c1c1c6", "#b2b2b7", "#818187", "#dedee2", "#252528" };
+            int index = role == "base" ? 0 : role == "surface" ? 1 : role == "text" ? 2 : role == "muted" ? 3 : role == "faint" ? 4 : role == "border" ? 5 : role == "accent" ? 6 : 7;
+            return ColorTranslator.FromHtml(palette[index]);
+        }
+
+        public static void Refresh(Control control)
+        {
+            string source = control.Tag as string;
+            if (source != null) control.Text = Translate(source);
+            control.BackColor = ColorFor(control is Button || control is ComboBox || control is TextBox ? "surface" : "base");
+            control.ForeColor = ColorFor(control is Label && !control.Font.Bold ? "muted" : "text");
+            Button button = control as Button;
+            if (button != null)
+            {
+                button.FlatAppearance.BorderColor = ColorFor("border");
+                if (button.Name == "primary") { button.BackColor = ColorFor("accent"); button.ForeColor = ColorFor("onAccent"); }
+            }
+            LinkLabel link = control as LinkLabel;
+            if (link != null) { link.LinkColor = ColorFor("accent"); link.ActiveLinkColor = link.LinkColor; link.VisitedLinkColor = link.LinkColor; }
+            foreach (Control child in control.Controls) Refresh(child);
+            control.Invalidate();
+        }
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct IoCounters
@@ -239,6 +362,7 @@ internal static class MoE4All
         try
         {
             RepairLauncherConfiguration(root);
+            AgentWindow.LoadAppearance(root);
             PrepareProductDirectories(root);
             logPath = Path.Combine(root, "data", "logs", "launcher.log");
             log = new StreamWriter(new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), new UTF8Encoding(false));
@@ -262,8 +386,7 @@ internal static class MoE4All
             {
                 if (!first)
                 {
-                    MessageBox.Show("MoE4All Agent is already running in this Windows session.", "MoE4All Agent",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    AgentWindow.ShowNativeNotice(Presentation.Translate("MoE4All Agent is already running in this Windows session."));
                     return 2;
                 }
                 Application.EnableVisualStyles();
@@ -279,8 +402,7 @@ internal static class MoE4All
             WriteMessage("MoE4All Agent could not start: " + error, true);
             if (!headless)
             {
-                MessageBox.Show("MoE4All Agent could not start.\r\n\r\n" + error.Message + "\r\n\r\nLog: " + logPath,
-                    "MoE4All Agent", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AgentWindow.ShowNativeNotice(Presentation.Translate("启动遇到问题") + "\r\n\r\n" + error.Message + "\r\n\r\nLog: " + logPath);
             }
             return 1;
         }
@@ -330,18 +452,57 @@ internal static class MoE4All
             testWindow.Show();
             Application.DoEvents();
             Size[] sizes = { new Size(760, 520), new Size(1024, 640), new Size(1280, 760) };
+            string screenshotDirectory = Path.Combine(root, "screenshots");
+            Directory.CreateDirectory(screenshotDirectory);
+            foreach (string language in new string[] { "zh", "en" })
+            foreach (string theme in new string[] { "green", "black", "gray", "white" })
             foreach (Size size in sizes)
             {
+                testWindow.SetAppearanceForTest(language, theme);
+                foreach (string surface in new string[] { "base", "surface" })
+                foreach (string foreground in new string[] { "text", "muted", "faint", "error", "success" })
+                {
+                    if (Contrast(Presentation.ColorFor(surface), Presentation.ColorFor(foreground)) < 4.5)
+                        throw new InvalidOperationException("Native contrast failed: " + theme + " " + foreground + " on " + surface);
+                }
+                if (Contrast(Presentation.ColorFor("accent"), Presentation.ColorFor("onAccent")) < 4.5)
+                    throw new InvalidOperationException("Native primary button contrast failed: " + theme);
                 string error;
                 if (!testWindow.ValidateStartupLayoutForTest(size, out error))
                 {
                     Console.Error.WriteLine("Startup UI layout failed at " + size.Width + "x" + size.Height + ": " + error);
                     return 5;
                 }
+                if (size.Width == 1024)
+                {
+                    testWindow.ExportBootstrapForTest(screenshotDirectory, language + "-" + theme);
+                    using (Bitmap bitmap = new Bitmap(testWindow.Width, testWindow.Height))
+                    {
+                        testWindow.DrawToBitmap(bitmap, new Rectangle(0, 0, testWindow.Width, testWindow.Height));
+                        bitmap.Save(Path.Combine(screenshotDirectory, language + "-" + theme + ".png"));
+                    }
+
+                }
             }
         }
-        Console.WriteLine("Startup UI layout tests passed at 760x520, 1024x640 and 1280x760.");
+        Console.WriteLine("Startup UI passed: two languages, four palettes, three window sizes.");
         return 0;
+    }
+
+    private static double Luminance(Color color)
+    {
+        double result = 0;
+        double[] components = { color.R / 255.0, color.G / 255.0, color.B / 255.0 };
+        double[] weights = { 0.2126, 0.7152, 0.0722 };
+        for (int index = 0; index < components.Length; index++)
+            result += (components[index] <= 0.04045 ? components[index] / 12.92 : Math.Pow((components[index] + 0.055) / 1.055, 2.4)) * weights[index];
+        return result;
+    }
+
+    private static double Contrast(Color a, Color b)
+    {
+        double first = Luminance(a), second = Luminance(b);
+        return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
     }
 
     private sealed class StartupProgressIndicator : Control
@@ -368,6 +529,8 @@ internal static class MoE4All
             };
             animation.Start();
         }
+
+        public int ProgressValue { get { return progress / 10; } }
 
         public void SetProgress(int value)
         {
@@ -401,11 +564,11 @@ internal static class MoE4All
             int barHeight = Math.Min(8, Math.Max(4, ClientSize.Height - 2));
             Rectangle track = new Rectangle(0, (ClientSize.Height - barHeight) / 2, ClientSize.Width - 1, barHeight);
             using (GraphicsPath trackPath = RoundedRectangle(track, barHeight / 2))
-            using (SolidBrush trackBrush = new SolidBrush(Color.FromArgb(57, 60, 65)))
+            using (SolidBrush trackBrush = new SolidBrush(Presentation.ColorFor("border")))
             {
                 e.Graphics.FillPath(trackBrush, trackPath);
                 e.Graphics.SetClip(trackPath);
-                Color fillColor = failed ? Color.FromArgb(199, 93, 93) : Color.FromArgb(126, 181, 151);
+                Color fillColor = failed ? Presentation.ColorFor("error") : Presentation.ColorFor("accent");
                 using (SolidBrush fillBrush = new SolidBrush(fillColor))
                 {
                     if (indeterminate)
@@ -455,6 +618,26 @@ internal static class MoE4All
         }
     }
 
+    private sealed class AppearanceButton : Button
+    {
+        private bool hovered;
+        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            bool primary = Name == "primary" && Enabled;
+            Color fill = Presentation.ColorFor(primary ? (hovered ? "muted" : "accent") : FlatAppearance.BorderSize == 0 && !hovered ? "base" : "surface");
+            Color text = Presentation.ColorFor(!Enabled ? "faint" : primary ? "onAccent" : "text");
+            using (SolidBrush brush = new SolidBrush(fill)) e.Graphics.FillRectangle(brush, ClientRectangle);
+            if (FlatAppearance.BorderSize > 0)
+                using (Pen pen = new Pen(Presentation.ColorFor("border")))
+                    e.Graphics.DrawRectangle(pen, 0, 0, Math.Max(0, Width - 1), Math.Max(0, Height - 1));
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -3, -3), text, fill);
+        }
+    }
+
     private sealed class AgentWindow : Form
     {
         private readonly string root;
@@ -474,13 +657,20 @@ internal static class MoE4All
         private readonly Button detailsButton;
         private readonly Button logButton;
         private readonly Button browserButton;
-        private readonly Button updateButton;
         private readonly Button runtimeButton;
         private readonly WebView2 webView;
         private readonly string installedVersion;
+        private readonly ToolTip toolbarTip = new ToolTip();
+        private Task browserInitialization;
+        private bool bootstrapLoaded;
+        private bool bootstrapFailed;
+        private bool desktopBridgeReady;
+        private bool desktopNotified;
+        private string desktopPhase = "idle";
+        private string desktopMessage = "";
+        private long desktopCompleted, desktopTotal;
         private IntPtr job = IntPtr.Zero;
         private DesktopBridge bridge;
-        private UpdateDialog updateDialog;
         private volatile bool closing;
         private volatile bool ready;
         private bool preparingProgress;
@@ -494,6 +684,7 @@ internal static class MoE4All
         public AgentWindow(string installRoot, bool startAgentOnShown = true)
         {
             root = installRoot;
+            LoadAppearance(root);
             firstLaunch = !Directory.Exists(Path.Combine(root, "data", "home", "profiles", "web", "node_modules"));
             installedVersion = ReadInstalledVersion(root);
             Text = "MoE4All Agent";
@@ -504,43 +695,31 @@ internal static class MoE4All
             int initialHeight = Math.Max(500, Math.Min(760, workingArea.Height - 48));
             MinimumSize = new Size(Math.Min(760, initialWidth), Math.Min(520, initialHeight));
             Size = new Size(initialWidth, initialHeight);
-            BackColor = Color.FromArgb(31, 32, 35);
-            ForeColor = Color.FromArgb(232, 234, 237);
+            BackColor = Presentation.ColorFor("base");
+            ForeColor = Presentation.ColorFor("text");
             Font = new Font("Segoe UI", 9F);
 
             Panel toolbar = new Panel();
             toolbar.Dock = DockStyle.Top;
-            toolbar.Height = 44;
-            toolbar.Padding = new Padding(14, 8, 10, 7);
-            toolbar.BackColor = Color.FromArgb(42, 44, 48);
-
-            Label title = new Label();
-            title.Text = "MoE4All";
-            title.Font = new Font("Segoe UI Semibold", 11F);
-            title.AutoSize = true;
-            title.Location = new Point(14, 12);
-            toolbar.Controls.Add(title);
-
+            toolbar.Height = 30;
+            toolbar.BackColor = BackColor;
             status = new Label();
-            status.Text = "Starting";
-            status.ForeColor = Color.FromArgb(176, 179, 184);
-            status.AutoSize = true;
-            status.Location = new Point(98, 14);
+            status.AutoSize = false;
+            status.Size = new Size(160, 24);
+            status.Location = new Point(12, 3);
+            Presentation.SetCopy(status, "Starting");
             toolbar.Controls.Add(status);
-
-            browserButton = CreateButton("Open in browser");
+            browserButton = new AppearanceButton();
+            browserButton.Text = "\uE774";
+            browserButton.Font = new Font("Segoe MDL2 Assets", 12F);
+            browserButton.AccessibleName = Presentation.Translate("Open in browser");
             browserButton.Dock = DockStyle.Right;
-            browserButton.Width = 118;
+            browserButton.Width = 34;
+            browserButton.FlatStyle = FlatStyle.Flat;
+            browserButton.FlatAppearance.BorderSize = 0;
+            browserButton.UseVisualStyleBackColor = false;
             browserButton.Click += delegate { OpenUrl("http://127.0.0.1:" + WebPort + "/"); };
             toolbar.Controls.Add(browserButton);
-
-            updateButton = CreateButton("Check updates");
-            updateButton.Dock = DockStyle.Right;
-            updateButton.Width = 112;
-            updateButton.Enabled = false;
-            updateButton.Click += delegate { ShowUpdates(); };
-            toolbar.Controls.Add(updateButton);
-
             webView = new WebView2();
             webView.Dock = DockStyle.Fill;
             webView.Visible = false;
@@ -571,28 +750,28 @@ internal static class MoE4All
             startup.Controls.Add(startupLayout);
 
             Label eyebrow = new Label();
-            eyebrow.Text = firstLaunch ? "MOE4ALL AGENT  /  FIRST LAUNCH" : "MOE4ALL AGENT";
+            Presentation.SetCopy(eyebrow, firstLaunch ? "MOE4ALL AGENT  /  FIRST LAUNCH" : "MOE4ALL AGENT");
             eyebrow.Dock = DockStyle.Fill;
             eyebrow.Font = new Font("Segoe UI Semibold", 9F);
-            eyebrow.ForeColor = Color.FromArgb(132, 184, 155);
+            eyebrow.ForeColor = Presentation.ColorFor("accent");
             eyebrow.TextAlign = ContentAlignment.MiddleLeft;
             startupLayout.Controls.Add(eyebrow, 0, 0);
 
             startupHeading = new Label();
-            startupHeading.Text = firstLaunch ? "专家正在登机" : "正在唤醒你的 Agent";
+            Presentation.SetCopy(startupHeading, firstLaunch ? "专家正在登机" : "正在唤醒你的 Agent");
             startupHeading.Dock = DockStyle.Fill;
             startupHeading.Font = new Font("Microsoft YaHei UI", 24F, FontStyle.Bold);
-            startupHeading.ForeColor = Color.FromArgb(239, 240, 242);
+            startupHeading.ForeColor = Presentation.ColorFor("text");
             startupHeading.TextAlign = ContentAlignment.MiddleLeft;
             startupLayout.Controls.Add(startupHeading, 0, 1);
 
             startupExplanation = new Label();
-            startupExplanation.Text = firstLaunch
+            Presentation.SetCopy(startupExplanation, firstLaunch
                 ? "这是第一次启动。MoE4All 正在准备 Agent 运行时、内置插件和独立工作区。只需一次，完成后会自动进入。"
-                : "正在连接本地运行时、内置插件和工作区，很快就好。";
+                : "正在连接本地运行时、内置插件和工作区，很快就好。");
             startupExplanation.Dock = DockStyle.Fill;
             startupExplanation.Font = new Font("Microsoft YaHei UI", 10F);
-            startupExplanation.ForeColor = Color.FromArgb(174, 178, 184);
+            startupExplanation.ForeColor = Presentation.ColorFor("muted");
             startupExplanation.TextAlign = ContentAlignment.TopLeft;
             startupLayout.Controls.Add(startupExplanation, 0, 2);
 
@@ -602,22 +781,22 @@ internal static class MoE4All
             progressHeader.RowCount = 1;
             progressHeader.Margin = Padding.Empty;
             progressHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            progressHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
+            progressHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 156F));
             progressHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             startupLayout.Controls.Add(progressHeader, 0, 4);
 
             progressText = new Label();
-            progressText.Text = firstLaunch ? "正在核验登机清单" : "正在检查本地运行时";
+            Presentation.SetCopy(progressText, firstLaunch ? "正在核验登机清单" : "正在检查本地运行时");
             progressText.Dock = DockStyle.Fill;
             progressText.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
-            progressText.ForeColor = Color.FromArgb(214, 216, 219);
+            progressText.ForeColor = Presentation.ColorFor("text");
             progressText.TextAlign = ContentAlignment.MiddleLeft;
             progressHeader.Controls.Add(progressText, 0, 0);
 
             progressPercent = new Label();
-            progressPercent.Text = "准备中";
+            Presentation.SetCopy(progressPercent, "准备中");
             progressPercent.Dock = DockStyle.Fill;
-            progressPercent.ForeColor = Color.FromArgb(142, 147, 154);
+            progressPercent.ForeColor = Presentation.ColorFor("faint");
             progressPercent.TextAlign = ContentAlignment.MiddleRight;
             progressHeader.Controls.Add(progressPercent, 1, 0);
 
@@ -627,12 +806,12 @@ internal static class MoE4All
             startupLayout.Controls.Add(progressBar, 0, 5);
 
             progressDetail = new Label();
-            progressDetail.Text = firstLaunch
+            Presentation.SetCopy(progressDetail, firstLaunch
                 ? "运行时、插件与工作区将在本机完成准备。"
-                : "正在复用已经准备好的本地资源。";
+                : "正在复用已经准备好的本地资源。");
             progressDetail.Dock = DockStyle.Fill;
             progressDetail.Font = new Font("Microsoft YaHei UI", 9F);
-            progressDetail.ForeColor = Color.FromArgb(139, 144, 151);
+            progressDetail.ForeColor = Presentation.ColorFor("faint");
             progressDetail.TextAlign = ContentAlignment.TopLeft;
             progressDetail.AutoEllipsis = true;
             startupLayout.Controls.Add(progressDetail, 0, 6);
@@ -653,9 +832,9 @@ internal static class MoE4All
             detailsPanel.Controls.Add(detailsLayout);
 
             Label detailsHeading = new Label();
-            detailsHeading.Text = "启动详情";
+            Presentation.SetCopy(detailsHeading, "启动详情");
             detailsHeading.Dock = DockStyle.Fill;
-            detailsHeading.ForeColor = Color.FromArgb(154, 158, 164);
+            detailsHeading.ForeColor = Presentation.ColorFor("faint");
             detailsHeading.TextAlign = ContentAlignment.MiddleLeft;
             detailsLayout.Controls.Add(detailsHeading, 0, 0);
 
@@ -664,20 +843,20 @@ internal static class MoE4All
             output.ReadOnly = true;
             output.ScrollBars = ScrollBars.Vertical;
             output.BorderStyle = BorderStyle.FixedSingle;
-            output.BackColor = Color.FromArgb(37, 38, 41);
-            output.ForeColor = Color.FromArgb(196, 199, 204);
+            output.BackColor = Presentation.ColorFor("surface");
+            output.ForeColor = Presentation.ColorFor("muted");
             output.Font = new Font("Consolas", 9F);
             output.Dock = DockStyle.Fill;
             output.Margin = Padding.Empty;
             detailsLayout.Controls.Add(output, 0, 1);
 
             Label firstLaunchNote = new Label();
-            firstLaunchNote.Text = firstLaunch
+            Presentation.SetCopy(firstLaunchNote, firstLaunch
                 ? "专家抵达后，后续启动会直接复用这套本地环境。"
-                : "本地环境已就位，正在等待 Agent 响应。";
+                : "本地环境已就位，正在等待 Agent 响应。");
             firstLaunchNote.Dock = DockStyle.Fill;
             firstLaunchNote.Font = new Font("Microsoft YaHei UI", 8.5F);
-            firstLaunchNote.ForeColor = Color.FromArgb(122, 127, 134);
+            firstLaunchNote.ForeColor = Presentation.ColorFor("faint");
             firstLaunchNote.TextAlign = ContentAlignment.MiddleLeft;
             startupLayout.Controls.Add(firstLaunchNote, 0, 8);
 
@@ -690,20 +869,20 @@ internal static class MoE4All
             startupLayout.Controls.Add(startupActions, 0, 9);
 
             detailsButton = CreateButton("查看启动详情");
-            detailsButton.Width = 122;
+            detailsButton.Width = 204;
             detailsButton.Margin = new Padding(0, 0, 10, 0);
             detailsButton.Click += delegate { SetDetailsVisible(!detailsPanel.Visible); };
             startupActions.Controls.Add(detailsButton);
 
             runtimeButton = CreateButton("Install WebView2 Runtime");
             runtimeButton.Visible = false;
-            runtimeButton.Width = 180;
+            runtimeButton.Width = 198;
             runtimeButton.Margin = new Padding(0, 0, 10, 0);
             runtimeButton.Click += delegate { OpenUrl("https://developer.microsoft.com/microsoft-edge/webview2/"); };
             startupActions.Controls.Add(runtimeButton);
 
             logButton = CreateButton("打开启动日志");
-            logButton.Width = 138;
+            logButton.Width = 180;
             logButton.Margin = Padding.Empty;
             logButton.Click += delegate { OpenLog(root); };
             startupActions.Controls.Add(logButton);
@@ -711,9 +890,144 @@ internal static class MoE4All
             Controls.Add(webView);
             Controls.Add(startup);
             Controls.Add(toolbar);
-            Load += delegate { FitToWorkingArea(); };
-            if (startAgentOnShown) Shown += delegate { StartAgent(); };
+            RefreshAppearance();
+            Load += delegate { FitToWorkingArea(); ApplyWindowTheme(Handle); };
+            SystemEvents.UserPreferenceChanged += OnSystemAppearanceChanged;
+            if (startAgentOnShown) Shown += async delegate { await InitializeBrowser(); if (!closing) StartAgent(); };
             FormClosing += OnClosing;
+        }
+
+        public static void LoadAppearance(string root)
+        {
+            string path = Path.Combine(root, "data", "desktop-appearance.json");
+            if (!File.Exists(path)) return;
+            try
+            {
+                Dictionary<string, object> value = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path));
+                object language, theme, preference, dark;
+                if (value.TryGetValue("language", out language) && (language as string == "en" || language as string == "zh")) Presentation.Language = (string)language;
+                if (value.TryGetValue("darkPreference", out dark) && IsTheme(dark as string) && dark as string != "white") Presentation.DarkPreference = (string)dark;
+                if (value.TryGetValue("preference", out preference) && (IsTheme(preference as string) || preference as string == "system")) Presentation.Preference = (string)preference;
+                else if (value.TryGetValue("theme", out theme) && IsTheme(theme as string)) Presentation.Preference = (string)theme;
+                ResolveSystemAppearance();
+            }
+            catch (Exception error) { WriteMessage("Could not load desktop appearance: " + error.Message); }
+        }
+
+        private static bool IsTheme(string theme)
+        {
+            return theme == "green" || theme == "black" || theme == "gray" || theme == "white";
+        }
+
+        private void SaveAppearance()
+        {
+            try
+            {
+                string directory = Path.Combine(root, "data");
+                Directory.CreateDirectory(directory);
+                string json = new JavaScriptSerializer().Serialize(new { language = Presentation.Language, theme = Presentation.Theme, preference = Presentation.Preference, darkPreference = Presentation.DarkPreference });
+                File.WriteAllText(Path.Combine(directory, "desktop-appearance.json"), json, new UTF8Encoding(false));
+            }
+            catch (Exception error) { WriteMessage("Could not save desktop appearance: " + error.Message); }
+        }
+
+        private static void ResolveSystemAppearance()
+        {
+            bool dark = true;
+            try
+            {
+                object setting = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0);
+                dark = Convert.ToInt32(setting) == 0;
+            }
+            catch { }
+            Presentation.Theme = Presentation.Preference == "system" ? (dark ? Presentation.DarkPreference : "white") : Presentation.Preference;
+        }
+        private void OnSystemAppearanceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (closing || !IsHandleCreated) return;
+            try { BeginInvoke(new Action(delegate { ResolveSystemAppearance(); RefreshAppearance(); })); }
+            catch (InvalidOperationException) { }
+        }
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr handle, int attribute, ref int value, int size);
+        private static void ApplyWindowTheme(IntPtr handle)
+        {
+            if (handle == IntPtr.Zero) return;
+            int dark = Presentation.Theme == "white" ? 0 : 1;
+            int caption = ColorTranslator.ToWin32(Presentation.ColorFor("base"));
+            int text = ColorTranslator.ToWin32(Presentation.ColorFor("text"));
+            try
+            {
+                DwmSetWindowAttribute(handle, 20, ref dark, 4);
+                DwmSetWindowAttribute(handle, 35, ref caption, 4);
+                DwmSetWindowAttribute(handle, 36, ref text, 4);
+            }
+            catch (DllNotFoundException) { }
+        }
+        private void RefreshAppearance()
+        {
+            Presentation.Refresh(this);
+            browserButton.BackColor = BackColor;
+            toolbarTip.SetToolTip(browserButton, Presentation.Translate("Open in browser"));
+            browserButton.AccessibleName = Presentation.Translate("Open in browser");
+            ApplyWindowTheme(IsHandleCreated ? Handle : IntPtr.Zero);
+            PushStartupState();
+        }
+        private void PublishDesktopState(bool open)
+        {
+            if (closing || IsDisposed || !ready || !desktopBridgeReady || webView.CoreWebView2 == null) return;
+            if (open && desktopPhase == "available") desktopNotified = true;
+            string json = new JavaScriptSerializer().Serialize(new {
+                type = "moe4all-desktop-state", phase = desktopPhase,
+                installedVersion = installedVersion, version = availableUpdate ?? "",
+                completed = desktopCompleted, total = desktopTotal, message = desktopMessage, open = open
+            });
+            webView.CoreWebView2.PostWebMessageAsJson(json);
+        }
+        private void ReceiveAppearance(object sender, CoreWebView2WebMessageReceivedEventArgs message)
+        {
+            try
+            {
+                Dictionary<string, object> value = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(message.WebMessageAsJson);
+                object type, command, language, theme, preference, dark;
+                if (value == null || !value.TryGetValue("type", out type)) return;
+                if (!ready && message.Source == "about:blank" && type as string == "moe4all-startup-command")
+                {
+                    if (!value.TryGetValue("command", out command)) return;
+                    if (command as string == "log") OpenLog(root);
+                    if (command as string == "runtime") OpenUrl("https://developer.microsoft.com/microsoft-edge/webview2/");
+                    if (command as string == "browser") OpenUrl("http://127.0.0.1:" + WebPort + "/");
+                    return;
+                }
+                Uri source;
+                if (!ready || !Uri.TryCreate(message.Source, UriKind.Absolute, out source) || source.Scheme != "http" || source.Host != "127.0.0.1" || source.Port != WebPort) return;
+                if (type as string == "moe4all-desktop-command")
+                {
+                    if (!value.TryGetValue("command", out command)) return;
+                    if (command as string == "status")
+                    {
+                        desktopBridgeReady = true;
+                        PublishDesktopState(desktopPhase == "available" && !desktopNotified);
+                    }
+                    if (command as string == "check") StartUpdateAction("Check", true);
+                    if (command as string == "install" && !string.IsNullOrEmpty(availableUpdate)) StartUpdateAction("Install", true);
+                    if (command as string == "browser") OpenUrl("http://127.0.0.1:" + WebPort + "/");
+                    if (command as string == "release" && !string.IsNullOrEmpty(availableUpdate))
+                        OpenUrl("https://github.com/Headmaster218/MoE4All-Agent/releases/tag/" + Uri.EscapeDataString(availableUpdate));
+                    return;
+                }
+                if (type as string != "moe4all-appearance") return;
+                if (!value.TryGetValue("language", out language) || (language as string != "en" && language as string != "zh")) return;
+                if (!value.TryGetValue("theme", out theme) || !IsTheme(theme as string)) return;
+                Presentation.Language = (string)language;
+                Presentation.Theme = (string)theme;
+                if (value.TryGetValue("preference", out preference) && (IsTheme(preference as string) || preference as string == "system")) Presentation.Preference = (string)preference;
+                else Presentation.Preference = Presentation.Theme;
+                if (value.TryGetValue("darkPreference", out dark) && IsTheme(dark as string) && dark as string != "white") Presentation.DarkPreference = (string)dark;
+                SaveAppearance();
+                RefreshAppearance();
+            }
+            catch (Exception error) { WriteMessage("Invalid desktop message: " + error.Message); }
         }
 
         private static string ReadInstalledVersion(string installRoot)
@@ -733,21 +1047,53 @@ internal static class MoE4All
 
         private static Button CreateButton(string text)
         {
-            Button button = new Button();
-            button.Text = text;
+            Button button = new AppearanceButton();
+            Presentation.SetCopy(button, text);
             button.Height = 29;
             button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = Color.FromArgb(82, 85, 91);
-            button.BackColor = Color.FromArgb(50, 52, 56);
-            button.ForeColor = Color.FromArgb(232, 234, 237);
+            button.FlatAppearance.BorderColor = Presentation.ColorFor("border");
+            button.BackColor = Presentation.ColorFor("surface");
+            button.ForeColor = Presentation.ColorFor("text");
             button.UseVisualStyleBackColor = false;
             return button;
+        }
+
+        public static void ShowNativeNotice(string message)
+        {
+            using (Form notice = new Form())
+            {
+                notice.Text = "MoE4All Agent";
+                notice.StartPosition = FormStartPosition.CenterScreen;
+                notice.AutoScaleMode = AutoScaleMode.Dpi;
+                notice.Font = new Font("Segoe UI", 10F);
+                notice.ClientSize = new Size(500, 250);
+                notice.Padding = new Padding(24);
+                notice.MinimumSize = new Size(420, 240);
+                TextBox body = new TextBox();
+                body.Multiline = true;
+                body.ReadOnly = true;
+                body.BorderStyle = BorderStyle.None;
+                body.ScrollBars = ScrollBars.Vertical;
+                body.Text = message;
+                body.Dock = DockStyle.Fill;
+                Button close = CreateButton("OK");
+                close.Dock = DockStyle.Bottom;
+                close.DialogResult = DialogResult.OK;
+                notice.Controls.Add(body);
+                notice.Controls.Add(close);
+                notice.AcceptButton = close;
+                notice.CancelButton = close;
+                Presentation.Refresh(notice);
+                body.BackColor = notice.BackColor;
+                notice.Shown += delegate { ApplyWindowTheme(notice.Handle); };
+                notice.ShowDialog();
+            }
         }
 
         private void SetDetailsVisible(bool visible)
         {
             detailsPanel.Visible = visible;
-            detailsButton.Text = visible ? "收起启动详情" : "查看启动详情";
+            Presentation.SetCopy(detailsButton, visible ? "收起启动详情" : "查看启动详情");
             startupLayout.PerformLayout();
         }
 
@@ -814,6 +1160,16 @@ internal static class MoE4All
             return true;
         }
 
+        public void SetAppearanceForTest(string language, string theme)
+        {
+            Presentation.Language = language;
+            Presentation.Preference = theme;
+            Presentation.Theme = theme;
+            RefreshAppearance();
+            string expected = language == "zh" ? "专家正在登机" : "Experts are boarding";
+            if (startupHeading.Text != expected) throw new InvalidOperationException("Startup language did not switch.");
+        }
+
         private static bool ControlFitsInside(Control control, Control ancestor, out string error)
         {
             int x = 0;
@@ -843,44 +1199,6 @@ internal static class MoE4All
             return true;
         }
 
-        private void ShowUpdates()
-        {
-            EnsureUpdateDialog();
-            ShowUpdateDialog();
-            if (updateBusy) return;
-            if (!string.IsNullOrEmpty(availableUpdate))
-            {
-                updateDialog.ShowAvailable(availableUpdate, availableUpdateBytes);
-                return;
-            }
-            StartUpdateAction("Check", true);
-        }
-
-        private void EnsureUpdateDialog()
-        {
-            if (updateDialog != null && !updateDialog.IsDisposed) return;
-            updateDialog = new UpdateDialog(installedVersion,
-                delegate { StartUpdateAction("Check", true); },
-                delegate { StartUpdateAction("Install", true); },
-                delegate
-                {
-                    if (!string.IsNullOrEmpty(availableUpdate))
-                    {
-                        OpenUrl("https://github.com/Headmaster218/MoE4All/releases/tag/" + Uri.EscapeDataString(availableUpdate));
-                    }
-                });
-        }
-
-        private void ShowUpdateDialog()
-        {
-            if (!updateDialog.Visible) updateDialog.Show(this);
-            else
-            {
-                updateDialog.BringToFront();
-                updateDialog.Activate();
-            }
-        }
-
         private void StartUpdateAction(string action, bool revealResult)
         {
             if (closing || updateBusy || !ready) return;
@@ -888,26 +1206,20 @@ internal static class MoE4All
             string script = Path.Combine(root, "harness", "scripts", "Check-AgentUpdate.ps1");
             if (!File.Exists(manifest) || !File.Exists(script))
             {
-                EnsureUpdateDialog();
-                ShowUpdateDialog();
-                updateDialog.ShowError("The bundled updater is unavailable. Reinstall the complete MoE4All Agent package.");
+                desktopPhase = "error";
+                desktopMessage = Presentation.Translate("The bundled updater is unavailable. Reinstall the complete MoE4All Agent package.");
+                PublishDesktopState(revealResult);
                 return;
             }
-
             updateBusy = true;
             updateInstalling = action == "Install";
             updateStatusFailed = false;
             revealUpdateResult = revealResult;
-            updateButton.Enabled = false;
-            updateButton.Text = updateInstalling ? "Updating..." : "Checking...";
-            if (revealResult || updateInstalling)
-            {
-                EnsureUpdateDialog();
-                ShowUpdateDialog();
-                if (updateInstalling) updateDialog.ShowStage("download", "Starting update");
-                else updateDialog.ShowChecking();
-            }
-
+            desktopPhase = updateInstalling ? "download" : "checking";
+            desktopMessage = "";
+            desktopCompleted = 0;
+            desktopTotal = updateInstalling ? availableUpdateBytes : 0;
+            PublishDesktopState(revealResult);
             Thread worker = new Thread(new ThreadStart(delegate { RunUpdateAction(action); }));
             worker.IsBackground = true;
             worker.Name = "MoE4All Agent updater";
@@ -987,83 +1299,26 @@ internal static class MoE4All
         private void ApplyUpdateStatus(string kind, long completed, long total, string message)
         {
             if (IsDisposed) return;
-            if (kind == "checking")
-            {
-                if (updateInstalling && updateDialog != null) updateDialog.ShowStage("download", "Checking release information");
-                else if (revealUpdateResult && updateDialog != null) updateDialog.ShowChecking();
-                return;
-            }
-            if (kind == "none")
-            {
-                availableUpdate = null;
-                availableUpdateBytes = 0;
-                updateButton.Text = "Check updates";
-                updateButton.BackColor = Color.FromArgb(50, 52, 56);
-                updateButton.FlatAppearance.BorderColor = Color.FromArgb(82, 85, 91);
-                if (revealUpdateResult)
-                {
-                    EnsureUpdateDialog();
-                    ShowUpdateDialog();
-                    updateDialog.ShowCurrent();
-                }
-                return;
-            }
-            if (kind == "available")
-            {
-                availableUpdate = message;
-                availableUpdateBytes = total;
-                updateButton.Text = "Update available";
-                updateButton.BackColor = Color.FromArgb(62, 91, 76);
-                updateButton.FlatAppearance.BorderColor = Color.FromArgb(93, 132, 111);
-                EnsureUpdateDialog();
-                ShowUpdateDialog();
-                updateDialog.ShowAvailable(availableUpdate, availableUpdateBytes);
-                return;
-            }
-            if (kind == "error")
-            {
-                updateStatusFailed = true;
-                if (revealUpdateResult || updateInstalling)
-                {
-                    EnsureUpdateDialog();
-                    ShowUpdateDialog();
-                    updateDialog.ShowError(message);
-                }
-                return;
-            }
-
-            EnsureUpdateDialog();
-            ShowUpdateDialog();
-            if (kind == "download") updateDialog.ShowDownload(completed, total, message);
-            else updateDialog.ShowStage(kind, message);
+            if (kind == "checking" && updateInstalling) return;
+            desktopPhase = kind == "none" ? "current" : kind;
+            desktopCompleted = Math.Max(0, completed);
+            desktopTotal = Math.Max(0, total);
+            desktopMessage = message;
+            if (kind == "none") { availableUpdate = null; availableUpdateBytes = 0; }
+            if (kind == "available") { availableUpdate = message; availableUpdateBytes = total; }
+            if (kind == "error") updateStatusFailed = true;
+            PublishDesktopState(kind == "available" || (kind == "error" && (revealUpdateResult || updateInstalling)));
         }
-
         private void FinishUpdateAction(string action, int exitCode, string error)
         {
             updateBusy = false;
-            updateButton.Enabled = ready;
-            if (updateInstalling) updateInstalling = false;
-
-            if (updateStatusFailed)
+            updateInstalling = false;
+            if (exitCode != 0 && !updateStatusFailed)
             {
-                updateButton.Text = string.IsNullOrEmpty(availableUpdate) ? "Check updates" : "Update available";
-                return;
+                desktopPhase = "error";
+                desktopMessage = string.IsNullOrEmpty(error) ? "The updater exited before completing." : error;
             }
-            if (exitCode != 0)
-            {
-                updateButton.Text = string.IsNullOrEmpty(availableUpdate) ? "Check updates" : "Update available";
-                if (revealUpdateResult || action == "Install")
-                {
-                    EnsureUpdateDialog();
-                    ShowUpdateDialog();
-                    updateDialog.ShowError(string.IsNullOrEmpty(error) ? "The updater exited before completing." : error);
-                }
-                return;
-            }
-            if (action == "Check" && !string.IsNullOrEmpty(availableUpdate) && updateDialog != null)
-            {
-                updateDialog.ShowAvailable(availableUpdate, availableUpdateBytes);
-            }
+            PublishDesktopState(exitCode != 0 && revealUpdateResult);
         }
 
         public void AppendLog(string message, bool isError)
@@ -1075,11 +1330,12 @@ internal static class MoE4All
                 catch (InvalidOperationException) { }
                 return;
             }
-            if (isError) status.Text = "Needs attention";
-            else if (ready) status.Text = "Ready";
-            else if (!preparingProgress) status.Text = "Starting";
-            if (isError) status.ForeColor = Color.FromArgb(235, 112, 112);
+            if (isError) Presentation.SetCopy(status, "Needs attention");
+            else if (ready) Presentation.SetCopy(status, "Ready");
+            else if (!preparingProgress) Presentation.SetCopy(status, "Starting");
+            if (isError) status.ForeColor = Presentation.ColorFor("error");
             output.AppendText(message + Environment.NewLine);
+            if (bootstrapFailed) PushStartupState();
         }
 
         public void UpdatePreparationProgress(long completed, long total, string message)
@@ -1095,11 +1351,12 @@ internal static class MoE4All
             int value = total <= 0 ? 0 : (int)Math.Max(0, Math.Min(1000, completed * 1000 / total));
             int percent = value / 10;
             progressBar.SetProgress(value);
-            progressText.Text = PreparationStage(percent);
-            progressDetail.Text = PreparationDetail(message);
-            progressPercent.Text = percent + "%";
-            status.Text = "Preparing " + percent + "%";
-            status.ForeColor = Color.FromArgb(176, 179, 184);
+            Presentation.SetCopy(progressText, PreparationStage(percent));
+            Presentation.SetCopy(progressDetail, PreparationDetail(message));
+            Presentation.SetCopy(progressPercent, percent + "%");
+            Presentation.SetCopy(status, "Preparing " + percent + "%");
+            status.ForeColor = Presentation.ColorFor("muted");
+            PushStartupState();
         }
 
         private void CompletePreparation()
@@ -1112,11 +1369,12 @@ internal static class MoE4All
                 return;
             }
             preparingProgress = false;
-            progressText.Text = firstLaunch ? "专家已落地，正在唤醒 Agent" : "本地环境就绪，正在唤醒 Agent";
-            progressDetail.Text = "正在启动桌面界面与本地服务。";
-            progressPercent.Text = "启动中";
+            Presentation.SetCopy(progressText, firstLaunch ? "专家已落地，正在唤醒 Agent" : "本地环境就绪，正在唤醒 Agent");
+            Presentation.SetCopy(progressDetail, "正在启动桌面界面与本地服务。");
+            Presentation.SetCopy(progressPercent, "启动中");
             progressBar.SetIndeterminate();
-            status.Text = "Starting";
+            Presentation.SetCopy(status, "Starting");
+            PushStartupState();
         }
 
         private void StartAgent()
@@ -1198,14 +1456,19 @@ internal static class MoE4All
         private void OnAgentReady()
         {
             ready = true;
-            status.Text = "Ready";
-            status.ForeColor = Color.FromArgb(131, 201, 157);
-            updateButton.Enabled = true;
+            Presentation.SetCopy(status, "Ready");
+            status.ForeColor = Presentation.ColorFor("success");
+            status.Visible = false;
             ActivateWebView();
-            StartUpdateAction("Check", false);
+            if (File.Exists(Path.Combine(root, "harness", "distribution", "agent-release.json"))) StartUpdateAction("Check", false);
         }
 
-        private async void ActivateWebView()
+        private Task InitializeBrowser()
+        {
+            if (browserInitialization == null) browserInitialization = InitializeBrowserCore();
+            return browserInitialization;
+        }
+        private async Task InitializeBrowserCore()
         {
             try
             {
@@ -1213,37 +1476,78 @@ internal static class MoE4All
                 Directory.CreateDirectory(userData);
                 CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(null, userData);
                 await webView.EnsureCoreWebView2Async(environment);
+                webView.CoreWebView2.WebMessageReceived += ReceiveAppearance;
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-                webView.CoreWebView2.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e)
-                {
-                    e.Handled = true;
-                    OpenUrl(e.Uri);
-                };
+                webView.CoreWebView2.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; OpenUrl(e.Uri); };
                 webView.CoreWebView2.NavigationStarting += delegate(object sender, CoreWebView2NavigationStartingEventArgs e)
                 {
                     Uri uri;
-                    if (Uri.TryCreate(e.Uri, UriKind.Absolute, out uri) && !uri.IsLoopback)
-                    {
-                        e.Cancel = true;
-                        OpenUrl(e.Uri);
-                    }
+                    if (Uri.TryCreate(e.Uri, UriKind.Absolute, out uri) && e.Uri != "about:blank"
+                        && !(uri.Scheme == "http" && uri.Host == "127.0.0.1" && uri.Port == WebPort))
+                    { e.Cancel = true; if (uri.Scheme == "https" || uri.Scheme == "http") OpenUrl(e.Uri); }
                 };
-                webView.Source = new Uri("http://127.0.0.1:" + WebPort + "/");
-                startup.Visible = false;
-                webView.Visible = true;
-                webView.BringToFront();
-            }
-            catch (WebView2RuntimeNotFoundException error)
-            {
-                runtimeButton.Visible = true;
-                Fail("Microsoft WebView2 Runtime is not installed. Install it or use Open in browser. " + error.Message);
+                webView.CoreWebView2.NavigationCompleted += delegate { if (!ready) { bootstrapLoaded = true; PushStartupState(); } else PublishDesktopState(false); };
+                ShowBootstrap();
             }
             catch (Exception error)
             {
-                Fail("The desktop view could not start. You can continue with Open in browser. " + error.Message);
+                runtimeButton.Visible = true;
+                WriteMessage("The desktop view is unavailable. Install WebView2 or use Open in browser. " + error.Message, true);
             }
         }
+        private void ShowBootstrap()
+        {
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("MoE4All.Startup.html"))
+            using (StreamReader reader = new StreamReader(stream)) webView.CoreWebView2.NavigateToString(reader.ReadToEnd().Replace("/*INITIAL_STATE*/", "window.setState(" + StartupStateJson() + ");"));
+            startup.Visible = false;
+            webView.Visible = true;
+            webView.BringToFront();
+        }
+        private async void ActivateWebView()
+        {
+            await InitializeBrowser();
+            if (closing || webView.CoreWebView2 == null) return;
+            bootstrapLoaded = false;
+            desktopBridgeReady = false;
+            webView.Source = new Uri("http://127.0.0.1:" + WebPort + "/");
+        }
+        private async void PushStartupState()
+        {
+            if (ready || !bootstrapLoaded || webView.CoreWebView2 == null) return;
+            try { await webView.CoreWebView2.ExecuteScriptAsync("window.setState(" + StartupStateJson() + ")"); }
+            catch (Exception error) { if (!closing) WriteMessage("Could not refresh startup view: " + error.Message); }
+        }
+
+        private string StartupStateJson()
+        {
+            var colors = new Dictionary<string, string>();
+            foreach (string role in new string[] { "base", "surface", "text", "muted", "faint", "border", "accent", "error" })
+                colors[role] = ColorTranslator.ToHtml(Presentation.ColorFor(role));
+            var value = new {
+                language = Presentation.Language, theme = Presentation.Theme, colors = colors,
+                first = firstLaunch, failed = bootstrapFailed, heading = startupHeading.Text,
+                explanation = startupExplanation.Text, stage = progressText.Text, detail = progressDetail.Text,
+                percent = progressPercent.Text, progress = preparingProgress ? (object)progressBar.ProgressValue : null,
+                log = output.Text.Length > 16000 ? output.Text.Substring(output.Text.Length - 16000) : output.Text,
+                detailsLabel = Presentation.Translate("查看启动详情"), logLabel = Presentation.Translate("打开启动日志"),
+                browserLabel = Presentation.Translate("Open in browser")
+            };
+            return new JavaScriptSerializer().Serialize(value);
+        }
+
+        public void ExportBootstrapForTest(string directory, string name)
+        {
+            File.WriteAllText(Path.Combine(directory, name + ".json"), StartupStateJson(), new UTF8Encoding(false));
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("MoE4All.Startup.html"))
+            using (StreamReader reader = new StreamReader(stream)) File.WriteAllText(Path.Combine(directory, "startup.html"), reader.ReadToEnd(), new UTF8Encoding(false));
+            int actual;
+            if (DwmGetWindowAttribute(Handle, 35, out actual, 4) == 0 && actual != ColorTranslator.ToWin32(Presentation.ColorFor("base")))
+                throw new InvalidOperationException("The native title bar does not match the selected palette.");
+        }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmGetWindowAttribute(IntPtr handle, int attribute, out int value, int size);
 
         private void Fail(string message)
         {
@@ -1260,24 +1564,27 @@ internal static class MoE4All
         private void FailUi(string message)
         {
             ready = false;
+            bootstrapFailed = true;
             preparingProgress = false;
-            status.Text = "Needs attention";
-            status.ForeColor = Color.FromArgb(235, 112, 112);
-            startupHeading.Text = "启动遇到问题";
-            startupExplanation.Text = "MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。";
+            Presentation.SetCopy(status, "Needs attention");
+            status.ForeColor = Presentation.ColorFor("error");
+            Presentation.SetCopy(startupHeading, "启动遇到问题");
+            Presentation.SetCopy(startupExplanation, "MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。");
             progressBar.SetFailed();
-            progressText.Text = "需要处理后再继续";
-            progressDetail.Text = message;
-            progressPercent.Text = "已停止";
+            Presentation.SetCopy(progressText, "需要处理后再继续");
+            Presentation.SetCopy(progressDetail, message);
+            Presentation.SetCopy(progressPercent, "已停止");
             SetDetailsVisible(true);
-            startup.Visible = true;
-            startup.BringToFront();
+            if (webView.CoreWebView2 != null) { ShowBootstrap(); PushStartupState(); }
+            else { startup.Visible = true; startup.BringToFront(); }
             browserButton.Enabled = true;
         }
 
         private void OnClosing(object sender, FormClosingEventArgs e)
         {
             closing = true;
+            SystemEvents.UserPreferenceChanged -= OnSystemAppearanceChanged;
+            toolbarTip.Dispose();
             if (bridge != null) bridge.Dispose();
             IntPtr current = job;
             job = IntPtr.Zero;
@@ -1289,9 +1596,9 @@ internal static class MoE4All
             if (InvokeRequired) return (string)Invoke(new Func<string>(PickDirectory));
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "Select a MoE4All workspace directory";
+                dialog.Description = Presentation.Translate("Select a MoE4All workspace directory");
                 dialog.ShowNewFolderButton = true;
-                return dialog.ShowDialog(this) == DialogResult.OK ? dialog.SelectedPath : null;
+                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.SelectedPath : null;
             }
         }
 
@@ -1300,12 +1607,12 @@ internal static class MoE4All
             if (InvokeRequired) return (string)Invoke(new Func<string, string>(PickModel), initialDirectory);
             using (OpenFileDialog dialog = new OpenFileDialog())
             {
-                dialog.Title = "Select a MoE4All GGUF model";
-                dialog.Filter = "GGUF model (*.gguf)|*.gguf|All files (*.*)|*.*";
+                dialog.Title = Presentation.Translate("Select a MoE4All GGUF model");
+                dialog.Filter = Presentation.Translate("GGUF model (*.gguf)|*.gguf|All files (*.*)|*.*");
                 dialog.Multiselect = false;
                 dialog.CheckFileExists = true;
                 dialog.InitialDirectory = Directory.Exists(initialDirectory) ? initialDirectory : root;
-                return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.FileName : null;
             }
         }
 
@@ -1314,286 +1621,43 @@ internal static class MoE4All
             if (InvokeRequired) return (string)Invoke(new Func<string>(PickEngine));
             using (OpenFileDialog dialog = new OpenFileDialog())
             {
-                dialog.Title = "Select a MoE4All engine package or infr.exe";
+                dialog.Title = Presentation.Translate("Select a MoE4All engine package or infr.exe");
                 dialog.Filter = "MoE4All engine (*.zip;infr.exe)|*.zip;infr.exe|ZIP archive (*.zip)|*.zip|Engine executable (infr.exe)|infr.exe|All files (*.*)|*.*";
                 dialog.Multiselect = false;
                 dialog.CheckFileExists = true;
                 string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
                 dialog.InitialDirectory = Directory.Exists(downloads) ? downloads : root;
-                return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
+                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.FileName : null;
             }
         }
-    }
 
-    private sealed class UpdateDialog : Form
-    {
-        private readonly string installedVersion;
-        private readonly Action checkRequested;
-        private readonly Action installRequested;
-        private readonly Action releaseRequested;
-        private readonly Label statusText;
-        private readonly Label detailText;
-        private readonly Label progressText;
-        private readonly ProgressBar progressBar;
-        private readonly LinkLabel releaseLink;
-        private readonly Button primaryButton;
-        private readonly Button secondaryButton;
-        private bool hasUpdate;
-        private bool installing;
+        private delegate bool WindowVisitor(IntPtr handle, IntPtr parameter);
+        [DllImport("user32.dll")]
+        private static extern bool EnumThreadWindows(uint thread, WindowVisitor visitor, IntPtr parameter);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr handle, StringBuilder name, int capacity);
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
 
-        public UpdateDialog(string currentVersion, Action checkAction, Action installAction, Action releaseAction)
+        private DialogResult ShowThemedPicker(CommonDialog dialog)
         {
-            installedVersion = currentVersion;
-            checkRequested = checkAction;
-            installRequested = installAction;
-            releaseRequested = releaseAction;
-
-            Text = "MoE4All Agent updates";
-            StartPosition = FormStartPosition.CenterParent;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false;
-            MinimizeBox = false;
-            ShowInTaskbar = false;
-            ClientSize = new Size(560, 330);
-            BackColor = Color.FromArgb(31, 32, 35);
-            ForeColor = Color.FromArgb(232, 234, 237);
-            Font = new Font("Segoe UI", 9F);
-            AutoScaleMode = AutoScaleMode.Dpi;
-
-            Label heading = new Label();
-            heading.Text = "Agent updates";
-            heading.Font = new Font("Segoe UI Semibold", 17F);
-            heading.AutoSize = true;
-            heading.Location = new Point(28, 24);
-            Controls.Add(heading);
-
-            Label version = new Label();
-            version.Text = "Installed  " + installedVersion;
-            version.ForeColor = Color.FromArgb(166, 170, 176);
-            version.AutoSize = true;
-            version.Location = new Point(30, 62);
-            Controls.Add(version);
-
-            Panel separator = new Panel();
-            separator.BackColor = Color.FromArgb(61, 63, 68);
-            separator.Location = new Point(28, 91);
-            separator.Size = new Size(504, 1);
-            Controls.Add(separator);
-
-            statusText = new Label();
-            statusText.Text = "Ready to check";
-            statusText.Font = new Font("Segoe UI Semibold", 12F);
-            statusText.AutoEllipsis = true;
-            statusText.Location = new Point(28, 112);
-            statusText.Size = new Size(504, 28);
-            Controls.Add(statusText);
-
-            detailText = new Label();
-            detailText.Text = "Check GitHub for a newer MoE4All Agent package.";
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            detailText.Location = new Point(28, 145);
-            detailText.Size = new Size(504, 44);
-            Controls.Add(detailText);
-
-            progressBar = new ProgressBar();
-            progressBar.Location = new Point(28, 204);
-            progressBar.Size = new Size(504, 14);
-            progressBar.Minimum = 0;
-            progressBar.Maximum = 1000;
-            progressBar.Style = ProgressBarStyle.Continuous;
-            Controls.Add(progressBar);
-
-            progressText = new Label();
-            progressText.ForeColor = Color.FromArgb(153, 158, 165);
-            progressText.AutoEllipsis = true;
-            progressText.Location = new Point(28, 225);
-            progressText.Size = new Size(330, 20);
-            Controls.Add(progressText);
-
-            releaseLink = new LinkLabel();
-            releaseLink.Text = "View release page";
-            releaseLink.LinkColor = Color.FromArgb(145, 190, 164);
-            releaseLink.ActiveLinkColor = Color.FromArgb(177, 216, 194);
-            releaseLink.VisitedLinkColor = releaseLink.LinkColor;
-            releaseLink.AutoSize = true;
-            releaseLink.Location = new Point(30, 247);
-            releaseLink.Visible = false;
-            releaseLink.LinkClicked += delegate { releaseRequested(); };
-            Controls.Add(releaseLink);
-
-            primaryButton = MakeButton("Check for updates", true);
-            primaryButton.Location = new Point(346, 279);
-            primaryButton.Size = new Size(186, 31);
-            primaryButton.Click += delegate
+            uint thread = GetCurrentThreadId();
+            using (System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer())
             {
-                if (hasUpdate) installRequested();
-                else checkRequested();
-            };
-            Controls.Add(primaryButton);
-
-            secondaryButton = MakeButton("Close", false);
-            secondaryButton.Location = new Point(242, 279);
-            secondaryButton.Size = new Size(94, 31);
-            secondaryButton.Click += delegate { Hide(); };
-            Controls.Add(secondaryButton);
-
-            FormClosing += delegate(object sender, FormClosingEventArgs e)
-            {
-                if (installing)
+                timer.Interval = 80;
+                timer.Tick += delegate
                 {
-                    e.Cancel = true;
-                    return;
-                }
-                if (e.CloseReason == CloseReason.UserClosing)
-                {
-                    e.Cancel = true;
-                    Hide();
-                }
-            };
-        }
-
-        private static Button MakeButton(string text, bool primary)
-        {
-            Button button = new Button();
-            button.Text = text;
-            button.Height = 31;
-            button.FlatStyle = FlatStyle.Flat;
-            button.UseVisualStyleBackColor = false;
-            button.ForeColor = Color.FromArgb(239, 241, 243);
-            button.BackColor = primary ? Color.FromArgb(62, 91, 76) : Color.FromArgb(48, 50, 54);
-            button.FlatAppearance.BorderColor = primary ? Color.FromArgb(93, 132, 111) : Color.FromArgb(79, 82, 88);
-            return button;
-        }
-
-        private void SetProgress(long completed, long total)
-        {
-            progressBar.MarqueeAnimationSpeed = 0;
-            progressBar.Style = ProgressBarStyle.Continuous;
-            int value = total <= 0 ? 0 : (int)Math.Max(0, Math.Min(1000, completed * 1000 / total));
-            progressBar.Value = value;
-            progressText.Text = total > 0
-                ? FormatBytes(completed) + " / " + FormatBytes(total) + "  " + (value / 10) + "%"
-                : FormatBytes(completed);
-        }
-
-        private void SetIndeterminate(string caption)
-        {
-            progressBar.Value = 0;
-            progressBar.Style = ProgressBarStyle.Marquee;
-            progressBar.MarqueeAnimationSpeed = 24;
-            progressText.Text = caption;
-        }
-
-        private static string FormatBytes(long value)
-        {
-            if (value >= 1024L * 1024L * 1024L) return (value / (1024d * 1024d * 1024d)).ToString("0.0") + " GB";
-            if (value >= 1024L * 1024L) return (value / (1024d * 1024d)).ToString("0.0") + " MB";
-            if (value >= 1024L) return (value / 1024d).ToString("0.0") + " KB";
-            return value + " B";
-        }
-
-        private void SetButtons(bool canAct, string primaryText, string secondaryText)
-        {
-            primaryButton.Text = primaryText;
-            primaryButton.Enabled = canAct;
-            secondaryButton.Text = secondaryText;
-            secondaryButton.Enabled = !installing;
-        }
-
-        public void ShowChecking()
-        {
-            hasUpdate = false;
-            installing = false;
-            statusText.Text = "Checking for updates";
-            detailText.Text = "Contacting the official MoE4All release feed.";
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            releaseLink.Visible = false;
-            SetIndeterminate("Checking release information");
-            SetButtons(false, "Checking...", "Close");
-        }
-
-        public void ShowCurrent()
-        {
-            hasUpdate = false;
-            installing = false;
-            statusText.Text = "You're up to date";
-            detailText.Text = installedVersion + " is the newest available Agent version.";
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            releaseLink.Visible = false;
-            SetProgress(1, 1);
-            progressText.Text = "No update is required";
-            SetButtons(true, "Check again", "Close");
-        }
-
-        public void ShowAvailable(string version, long bytes)
-        {
-            hasUpdate = true;
-            installing = false;
-            statusText.Text = version + " is available";
-            detailText.Text = "Download and replace application files only. Models, conversations and caches stay in place; one previous version is kept for rollback.";
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            releaseLink.Visible = true;
-            SetProgress(0, bytes);
-            progressText.Text = bytes > 0 ? "Package size  " + FormatBytes(bytes) : "Ready to download";
-            SetButtons(true, "Download and install", "Not now");
-        }
-
-        public void ShowDownload(long completed, long total, string message)
-        {
-            hasUpdate = false;
-            installing = true;
-            statusText.Text = "Downloading update";
-            detailText.Text = "MoE4All Agent remains usable while the package downloads.";
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            releaseLink.Visible = false;
-            SetProgress(completed, total);
-            if (total <= 0) progressText.Text = message;
-            SetButtons(false, "Updating...", "Please wait");
-        }
-
-        public void ShowStage(string stage, string message)
-        {
-            hasUpdate = false;
-            installing = stage != "checking";
-            if (stage == "verify")
-            {
-                statusText.Text = "Verifying download";
-                detailText.Text = "Checking the package SHA-256 before any application files are changed.";
+                    EnumThreadWindows(thread, delegate(IntPtr handle, IntPtr parameter)
+                    {
+                        StringBuilder name = new StringBuilder(64);
+                        GetClassName(handle, name, name.Capacity);
+                        if (name.ToString() == "#32770") ApplyWindowTheme(handle);
+                        return true;
+                    }, IntPtr.Zero);
+                };
+                timer.Start();
+                return dialog.ShowDialog(this);
             }
-            else if (stage == "extract")
-            {
-                statusText.Text = "Preparing update";
-                detailText.Text = "Unpacking and validating the new application beside the current version.";
-            }
-            else if (stage == "install")
-            {
-                statusText.Text = "Installing and restarting";
-                detailText.Text = "The Agent window will close briefly, switch versions, and reopen automatically.";
-            }
-            else
-            {
-                statusText.Text = "Starting update";
-                detailText.Text = "Preparing a secure application-only update.";
-            }
-            detailText.ForeColor = Color.FromArgb(180, 184, 190);
-            releaseLink.Visible = false;
-            SetIndeterminate(message);
-            SetButtons(false, "Updating...", "Please wait");
-        }
-
-        public void ShowError(string message)
-        {
-            hasUpdate = false;
-            installing = false;
-            statusText.Text = "Update needs attention";
-            detailText.Text = message;
-            detailText.ForeColor = Color.FromArgb(235, 137, 137);
-            releaseLink.Visible = false;
-            progressBar.MarqueeAnimationSpeed = 0;
-            progressBar.Style = ProgressBarStyle.Continuous;
-            progressBar.Value = 0;
-            progressText.Text = "No application files were replaced";
-            SetButtons(true, "Try again", "Close");
         }
     }
 

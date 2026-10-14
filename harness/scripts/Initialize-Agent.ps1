@@ -130,7 +130,7 @@ ignore-scripts=true
 [System.IO.File]::WriteAllText((Join-Path $profile '.npmrc'), "$npmrc`n", $utf8)
 Copy-Item -LiteralPath (Join-Path $sourceProfile 'stubs') -Destination $profile -Recurse
 
-$settings = "ui-theme:`n  preference: dark`n"
+$settings = "ui-theme:`n  preference: gray`n"
 if ($DiscoverLocalModel) {
     try {
         $models = Invoke-RestMethod -Uri ($endpoint.AbsoluteUri.TrimEnd('/') + '/models') -TimeoutSec 5

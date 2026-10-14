@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module'
 
-const require = createRequire(new URL('../dsh/apps/web/package.json', import.meta.url))
+const require = createRequire(process.env.MOE4ALL_QA_MODULES
+  ? `${process.env.MOE4ALL_QA_MODULES}/package.json`
+  : new URL('../dsh/apps/web/package.json', import.meta.url))
 const { chromium } = require('playwright')
 const url = process.argv[2] ?? 'http://127.0.0.1:17373/'
 const screenshotPath = process.argv[3]

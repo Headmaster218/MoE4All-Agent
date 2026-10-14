@@ -1,0 +1,85 @@
+name: Windows Agent Release
+
+on:
+  push:
+    tags: ['release-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: powershell
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - name: Normalize source checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Validate main and release version
+        id: version
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $build = Get-Content harness/distribution/agent-build.json -Raw | ConvertFrom-Json
+          $tag = "release-$($build.version)"
+          git fetch origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch main.' }
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Release commit must belong to main.' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) { throw 'Tag and agent-build.json differ.' }
+          if ($env:GITHUB_REF_TYPE -ne 'tag' -and $env:GITHUB_REF_NAME -ne 'main') { throw 'Manual builds must use main.' }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+      - name: Build frozen desktop distribution
+        run: ./harness/scripts/Build-AgentRelease.ps1 -Version '${{ steps.version.outputs.tag }}'
+      - name: Run bootstrap and updater regression tests
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $node = (Get-ChildItem artifacts/agent-release -Filter node.exe -Recurse | Where-Object { $_.FullName -match 'bootstrap' } | Select-Object -First 1).FullName
+          & $node --test harness/scripts/Test-BundledRuntime.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed.' }
+          ./harness/scripts/Test-AgentUpdateVersion.ps1
+          ./harness/scripts/Test-AgentUpdate.ps1
+          ./harness/scripts/Test-AgentUpdate.ps1 -LegacyTags
+          ./harness/scripts/Test-AgentLauncher.ps1
+      - name: Cold ZIP startup and relocated startup
+        run: |
+          $zip = Get-ChildItem artifacts/agent-release -Filter '*.zip' | Select-Object -First 1
+          ./harness/scripts/Test-AgentRelease.ps1 -Archive $zip.FullName
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: windows-agent-${{ steps.version.outputs.tag }}
+          path: |
+            artifacts/agent-release/*.zip
+            artifacts/agent-release/*.sha256
+            artifacts/release-smoke/*.json
+            artifacts/release-smoke/*.png
+          if-no-files-found: error
+      - name: Create draft prerelease for final model acceptance
+        if: startsWith(github.ref, 'refs/tags/release-')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = '${{ steps.version.outputs.tag }}'
+          $assets = @(Get-ChildItem artifacts/agent-release -File | Where-Object { $_.Extension -eq '.zip' -or $_.Name.EndsWith('.sha256') } | ForEach-Object { $_.FullName })
+          $version = $tag -replace '^release-', ''
+          $notes = "documentation/releases/$version.md"
+          if (-not (Test-Path -LiteralPath $notes)) { throw 'Release notes are missing.' }
+          $options = @('release', 'create', $tag, '--verify-tag', '--draft', '--title', "MoE4All Agent $version", '--notes-file', $notes)
+          if ($version -match '-') { $options += '--prerelease' }
+          & gh @options @assets
+          if ($LASTEXITCODE -ne 0) { throw 'Creating the draft release failed.' }

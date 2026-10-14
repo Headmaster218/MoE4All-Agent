@@ -1,0 +1,8 @@
+{
+  "name": "moe4all-agent-build-tools",
+  "private": true,
+  "dependencies": {
+    "pnpm": "11.7.0",
+    "playwright": "1.61.1"
+  }
+}

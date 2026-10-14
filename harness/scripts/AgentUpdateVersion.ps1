@@ -1,5 +1,5 @@
 function Get-AgentVersionParts([string]$Tag) {
-    if ($Tag -notmatch '^agent-v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-preview\.([0-9]+))?$') { return $null }
+    if ($Tag -notmatch '^(?:agent-v|release-|v)([0-9]+)\.([0-9]+)\.([0-9]+)(?:-preview\.([0-9]+))?$') { return $null }
     $preview = if ($Matches.ContainsKey(4)) { [int]$Matches[4] } else { [int]::MaxValue }
     return @([version]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3]), $preview)
 }

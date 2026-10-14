@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidatePattern('^agent-v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$')]
+    [ValidatePattern('^(?:release-|agent-v)[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$')]
     [string]$Version,
     [string]$OutputDirectory,
     [string]$EngineExecutable,
@@ -12,12 +12,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $root 'artifacts\agent-release' }
-if (-not $EngineExecutable) {
-    $EngineExecutable = Join-Path (Split-Path -Parent $root) 'infr\target\release\infr.exe'
-}
 $output = [IO.Path]::GetFullPath($OutputDirectory)
-$engineExe = [IO.Path]::GetFullPath($EngineExecutable)
-$name = "MoE4All-Agent-Windows-x64-$Version"
+$engineExe = $null
+$engineVersion = $null
+$engineTag = $null
+$assetVersion = $Version -replace '^release-', 'v'
+$name = "MoE4All-Agent-Windows-x64-$assetVersion"
 $stage = Join-Path $output $name
 $archive = Join-Path $output "$name.zip"
 $checksum = "$archive.sha256"
@@ -25,14 +25,18 @@ $deploy = Join-Path $output "$name-dsh-deploy"
 if ((Test-Path -LiteralPath $stage) -or (Test-Path -LiteralPath $archive) -or (Test-Path -LiteralPath $deploy)) {
     throw "Release output already exists: $name"
 }
-if (-not (Test-Path -LiteralPath $engineExe -PathType Leaf)) { throw "Engine executable not found: $engineExe" }
-if ($Version -notmatch '^agent-v([0-9]+\.[0-9]+\.[0-9]+)') { throw 'Cannot derive the Engine version.' }
-$engineVersion = $Matches[1]
-$engineTag = "v$engineVersion"
-$engineOutput = ((& $engineExe --version 2>$null) -join ' ').Trim()
-if ($LASTEXITCODE -ne 0 -or $engineOutput -notmatch ("^infr\s+" + [regex]::Escape($engineVersion) + '$')) {
-    throw "Expected infr $engineVersion, got: $engineOutput"
+if ($EngineExecutable) {
+    $engineExe = [IO.Path]::GetFullPath($EngineExecutable)
+    if (-not (Test-Path -LiteralPath $engineExe -PathType Leaf)) { throw "Engine executable not found: $engineExe" }
+    $engineOutput = ((& $engineExe --version 2>$null) -join ' ').Trim()
+    if ($LASTEXITCODE -ne 0 -or $engineOutput -notmatch '^infr\s+([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)$') {
+        throw "Invalid Engine version: $engineOutput"
+    }
+    $engineVersion = $Matches[1]
+    $engineTag = "v$engineVersion"
 }
+$buildConfig = Get-Content -LiteralPath (Join-Path $root 'harness\distribution\agent-build.json') -Raw | ConvertFrom-Json
+if ($Version -ne "release-$($buildConfig.version)") { throw 'Release tag does not match agent-build.json.' }
 
 function Get-RelativePath([string]$base, [string]$path) {
     $basePath = [IO.Path]::GetFullPath($base).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
@@ -42,7 +46,7 @@ function Get-RelativePath([string]$base, [string]$path) {
     return [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($pathUri).ToString()).Replace('/', '\')
 }
 
-$status = & git -C $root status --porcelain --untracked-files=no
+$status = & git -C $root status --porcelain --untracked-files=all
 if ($LASTEXITCODE -ne 0 -or $status) { throw 'Commit tracked Agent changes before building a release.' }
 $rootCommit = (& git -C $root rev-parse HEAD).Trim()
 $paths = & git -C $root config --file (Join-Path $root '.gitmodules') --get-regexp '^submodule\..*\.path$'
@@ -57,7 +61,7 @@ foreach ($relative in $submodules) {
     $expected = $Matches[1]
     $actual = (& git -C $source rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) { throw "Submodule does not match its pin: $relative" }
-    $dirty = & git -C $source status --porcelain --untracked-files=no
+    $dirty = & git -C $source status --porcelain --untracked-files=all
     if ($LASTEXITCODE -ne 0 -or $dirty) { throw "Commit tracked submodule changes: $relative" }
 }
 
@@ -92,7 +96,7 @@ if ($BaseArchive) {
         $baseCommit = [string]$baseManifest.sourceCommit
         if ($baseManifest.schema -ne 2 -or $baseManifest.product -ne 'moe4all-agent' -or
             $baseManifest.packageKind -ne 'integrated' -or $baseManifest.engineVersion -ne $engineTag -or
-            $baseCommit -notmatch '^[0-9a-f]{40}$' -or $baseTop -ne "MoE4All-Agent-Windows-x64-$($baseManifest.version)") {
+            $baseCommit -notmatch '^[0-9a-f]{40}$' -or $baseTop -ne ("MoE4All-Agent-Windows-x64-" + ($baseManifest.version -replace '^release-', 'v'))) {
             throw 'The base archive is not a matching integrated Agent release.'
         }
     } finally { $baseReader.Dispose() }
@@ -116,17 +120,19 @@ if ($BaseArchive) {
     if (Test-Path -LiteralPath (Join-Path $stageHarness 'agent-state')) {
         throw 'The base archive contains user runtime state.'
     }
+    if ($engineExe) {
     $bundledEnginePath = Join-Path $stageHarness "runtime\engine\$engineTag\infr.exe"
     if ((Get-FileHash -LiteralPath $bundledEnginePath -Algorithm SHA256).Hash -ne
         (Get-FileHash -LiteralPath $engineExe -Algorithm SHA256).Hash) {
         throw 'The reused Engine differs from the selected release executable.'
+    }
     }
     foreach ($scriptName in @('AgentUpdateVersion.ps1', 'Check-AgentUpdate.ps1', 'Prepare-BundledRuntime.ps1', 'Run-Agent.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination (Join-Path $stageHarness "scripts\$scriptName") -Force
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Prepare-BundledRuntime.cjs') -Destination (Join-Path $stageHarness 'scripts\Prepare-BundledRuntime.cjs') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor') -Destination (Join-Path $stageHarness 'scripts\vendor') -Recurse -Force
-    foreach ($launcherSource in @('MoE4All.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config')) {
+    foreach ($launcherSource in @('MoE4All.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
         Copy-Item -LiteralPath (Join-Path $root "harness\launcher\$launcherSource") -Destination (Join-Path $stageHarness "launcher\$launcherSource") -Force
     }
     $stageLauncherVendor = Join-Path $stageHarness 'launcher\vendor'
@@ -156,6 +162,9 @@ New-Item -ItemType Directory -Path $output, $stage -Force | Out-Null
 $temp = Join-Path $output "$name-source.zip"
 $agentPaths = @(
     'harness/distribution/profile',
+    'harness/distribution/build-tools',
+    'harness/distribution/runtime-versions.json',
+    'harness/distribution/agent-build.json',
     'harness/launcher',
     'harness/scripts/AgentUpdateVersion.ps1',
     'harness/scripts/Build-Agent.ps1',
@@ -191,9 +200,12 @@ $manifest = [ordered]@{
     sourceCommit = $rootCommit
     dshCommit = $dshCommit
     engineVersion = $engineTag
+    runtimeVersions = (Get-Content -LiteralPath (Join-Path $root 'harness\distribution\runtime-versions.json') -Raw | ConvertFrom-Json)
+    profileLockSha256 = (Get-FileHash -LiteralPath (Join-Path $root 'harness\distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
+    submodules = @($submodules | ForEach-Object { [ordered]@{ path = $_; commit = (& git -C (Join-Path $root $_) rev-parse HEAD).Trim() } })
 }
 $manifestPath = Join-Path $stageHarness 'distribution\agent-release.json'
-[IO.File]::WriteAllText($manifestPath, (($manifest | ConvertTo-Json) + "`n"), (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($manifestPath, (($manifest | ConvertTo-Json -Depth 8) + "`n"), (New-Object Text.UTF8Encoding($false)))
 & (Join-Path $root 'harness\scripts\Build-AgentLauncher.ps1') -OutputPath (Join-Path $stage 'MoE4All.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Building the Agent EXE failed.' }
 
@@ -230,7 +242,7 @@ if ($PrebuiltHarnessRoot) {
     & robocopy $builtNode.Directory.FullName $stageNodeRoot /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Copying the prebuilt Node runtime failed (robocopy $LASTEXITCODE)." }
 } else {
-    & (Join-Path $stageHarness 'scripts\Build-Agent.ps1') -StateRoot (Join-Path $stageHarness 'agent-state')
+    & (Join-Path $stageHarness 'scripts\Build-Agent.ps1') -StateRoot (Join-Path $stageHarness 'agent-state') -Release
 }
 
 $node = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Filter node.exe -Recurse -ErrorAction SilentlyContinue |
@@ -370,6 +382,7 @@ if ($LASTEXITCODE -ge 8) { throw "Copying the production DSH deployment failed (
 $linksManifest = [ordered]@{ schema = 1; links = $links }
 [IO.File]::WriteAllText((Join-Path $stageRuntime 'dsh-links.json'), (($linksManifest | ConvertTo-Json -Depth 6) + "`n"), (New-Object Text.UTF8Encoding($false)))
 
+if ($engineExe) {
 $engineRoot = Join-Path $stageRuntime "engine\$engineTag"
 New-Item -ItemType Directory -Path $engineRoot -Force | Out-Null
 $bundledEngine = Join-Path $engineRoot 'infr.exe'
@@ -384,6 +397,8 @@ $engineManifest = [ordered]@{
 }
 [IO.File]::WriteAllText((Join-Path $stageRuntime 'engine\bundled-engine.json'), (($engineManifest | ConvertTo-Json) + "`n"), (New-Object Text.UTF8Encoding($false)))
 
+}
+
 $seed = Join-Path $stageHarness 'distribution\prebuilt-state'
 Move-Item -LiteralPath (Join-Path $stageHarness 'agent-state') -Destination $seed
 
@@ -396,7 +411,9 @@ $removePaths = @(
     (Join-Path $stageRuntime 'plugin-packs')
 )
 foreach ($path in $removePaths) {
-    if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
+    $resolved = [IO.Path]::GetFullPath($path)
+    if (-not $resolved.StartsWith($stageHarness + '\', [StringComparison]::OrdinalIgnoreCase)) { throw "Cleanup target escapes the release: $resolved" }
+    if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
 }
 Get-ChildItem -LiteralPath $stageRuntime -File -Filter 'node-v*-win-x64.zip' -ErrorAction SilentlyContinue |
     Remove-Item -Force
@@ -404,6 +421,7 @@ foreach ($scriptName in @('Build-Agent.ps1', 'Build-DevHarness.ps1', 'Initialize
     $path = Join-Path $stageHarness "scripts\$scriptName"
     if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
 }
+if (-not ([IO.Path]::GetFullPath($deploy)).StartsWith($output + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Deployment cleanup escapes output.' }
 Remove-Item -LiteralPath $deploy -Recurse -Force
 
 & (Join-Path $PSScriptRoot 'Pack-AgentRuntime.ps1') -HarnessRoot $stageHarness
