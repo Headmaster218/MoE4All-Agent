@@ -4,19 +4,20 @@ status: current
 scope: agent-development
 last_verified: 2026-10-15
 baseline_tag: release-0.1.0-preview.3
+verified_commit: 1d13586
 ---
 
 # Agent 源码开发入口
 
-这不是正式 Agent EXE 安装说明。先获取根仓库固定的 DSH 与八个插件 submodule，按[源码构建](../development/building-from-source.md)准备环境。
+这不是正式 Agent EXE 安装说明。先获取根仓库固定的 DSH 与八个插件 submodule；Node、pnpm 与下载校验值由 [`runtime-versions.json`](../../harness/distribution/runtime-versions.json) 固定，构建脚本会准备所需运行时。
 
 ```powershell
 git submodule update --init --recursive
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Build-Agent.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Run-Agent.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Run-Agent.ps1 -StateRoot harness/agent-state
 ```
 
-默认 Web 地址为 `http://127.0.0.1:17373`。源码构建状态在 `harness/agent-state/`，使用 `Run-Agent.ps1 -StateRoot harness/agent-state`；发行版 EXE 状态在安装目录的 `data/`。默认 Engine 地址为 `http://127.0.0.1:8080/v1`，首次启动需主动选择安装或导入，不会自动启后端；不运行本地引擎也能构建/检查 UI。首次初始化可单独使用 `Initialize-Agent.ps1`，现有配置会保留。
+默认 Web 地址为 `http://127.0.0.1:17373`。源码构建状态在 `harness/agent-state/`，使用 `Run-Agent.ps1 -StateRoot harness/agent-state`；发行版 EXE 状态在安装目录的 `data/`。默认 Engine 地址为 `http://127.0.0.1:8080/v1`。`preview.3` 首次启动需主动选择安装或导入；之后的本地提交 `1d13586` 为新初始化的 Agent 内置模式开启首次自动下载并选中引擎，但不会因此启动推理进程。已有 profile 不会被初始化脚本覆盖。不运行本地引擎也能构建/检查 UI。首次初始化可单独使用 `Initialize-Agent.ps1`。
 
 保持 MoE4All 与生产 DSH 的 home、agents、port 独立。不要将生产 profile 目录交给 Agent 脚本；外部 workspace 分享须主动授权。不要在发布构建中使用会拷贝生产凭据的旧 DevHarness 初始化路径。
 

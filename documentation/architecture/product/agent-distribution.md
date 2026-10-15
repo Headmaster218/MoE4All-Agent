@@ -2,16 +2,16 @@
 kind: architecture
 status: current
 scope: agent-product
-last_verified: 2026-10-11
-verified_commit: 7b4a9411e9c7524f8dc6ae2603c62d5f338190dc
-baseline_tag: release-0.10.0
+last_verified: 2026-10-15
+verified_commit: 1d13586
+baseline_tag: release-0.1.0-preview.3
 ---
 
 # Agent 产品与兼容边界
 
 ## 产品结构
 
-MoE4All Agent 复用 DSH 的 Agent、会话、工具、审批、插件与 profile，只替换可见品牌并提供维护插件；不新建第二套框架。推理仍由独立 `infr serve` 提供。0.10.0 纳入的是源码组合与隔离 Web 开发入口，不是正式 Agent EXE 安装包。
+MoE4All Agent 复用 DSH 的 Agent、会话、工具、审批、插件与 profile，只替换可见品牌并提供维护插件；不新建第二套框架。推理仍由独立 `infr serve` 提供。Agent 与 Engine 分仓、分别版本化；Agent Windows 包包含桌面壳、Node、DSH 与内置插件，不包含 Engine 或模型。
 
 ```text
 MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
@@ -23,25 +23,36 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 内部 `@deepseek-ai/dsh-*`、`DSH_HOME` 等兼容名保留以复用插件生态；保留变量名不等于共享变量值。连接已有引擎不获得该进程的生命周期所有权，不能把“连接”变成重启/停止生产后端。
 
-## tag 中的固定组合
+## `release-0.1.0-preview.3` 中的固定组合
 
-根 `.gitmodules` 全部指向 Headmaster218 维护仓库；gitlink 是版本事实，不以本机子模块工作树替代。
+下表记录发布 tag 的组合。根 `.gitmodules` 全部指向 Headmaster218 维护仓库；gitlink 是版本事实，不以本机子模块工作树替代。
 
 | 组件 | gitlink |
 | --- | --- |
-| DSH | `79bab8b84216fda929963f7d5248649feb240280` |
-| MoE4All provider | `41e137e29ca4ca4e0f24c482ca3cd22ba9e3ea79` |
-| 市场 | `ea381411bc360492371860f2d85070e11fe48d84` |
-| Mneme | `01ace38811e3b8b17413076dc7326e820c419500` |
-| EasyRewrite | `36fe6c186cbff19f476998f54f2b16dd1ca924d7` |
-| 定时任务 | `b4cb40a6c24ea5e51eb5760f74b7fd90484b48c6` |
-| TTS | `ad88d32ac5c0d09aba4b5dd19d956d3602664285` |
-| 手机/Remote Web UI | `323c98ba3559d7d976353e6e12ab3bf5f32384ce` |
+| DSH | `9b27adb07b998da0056ee0a171af17b7e18d97a8` |
+| MoE4All provider | `557e455d53bdfa44354b0d69e3e9a23e327e8494` |
+| 市场 | `dd2f5d23445523617abc495d7569e8edea1b501e` |
+| Mneme | `7c849bc96f7e401559d9e19bfaf948482d029f74` |
+| EasyRewrite | `50d7f94f2e479ce9f7000360794cf591bba5dc4f` |
+| 定时任务 | `5a6dc7b66f2dfe43df14fa15184a317a22e639e7` |
+| TTS | `d698174e5aad3085735ca33883279ed4d6548a77` |
+| 手机/Remote Web UI | `52cf83632f4a2153d68517f5cc57608e8ea0ab57` |
 | Brave 搜索 | `3b91a69766f6e4efbeeed64ffef709b26e211d3c` |
+
+## 发布后的本地改动
+
+`1d13586` 在上述发布基线上更新了 DSH 至 `f34e950`、MoE4All provider 至 `d2dd2ce`，其他插件 gitlink 未变。这些提交尚未发布：
+
+- 首次启动保留原生进度页，Agent 页面导航成功后才切换到 WebView；新安装默认使用绿色，已有配色设置继续保留。
+- Agent 内置模式首次自动下载并选中最新引擎；DSH 市场安装的独立插件默认提示用户选择安装，不自动下载引擎。自动下载失败后提供手动重试或导入入口。
+- 引擎启动失败的分类与建议支持当前界面的中英文设置；生成默认值增加思考模式及思考强度控件。
+- Bash/PowerShell 的本地执行器与 persistent terminal 默认输出预算为 4000 UTF-8 bytes；截断标记等结果元数据另计，旧 `maxOutputChars` 参数仍作为兼容入口。
+
+当前错误分类由插件分析启动日志完成，一槽重试仍会保存配置。后端结构化错误、启动管理通道、临时降级与恢复策略仍处于讨论阶段。
 
 ## 数据与运行隔离
 
-`Initialize-Agent.ps1` 默认在 `harness/agent-state/home` 建立新 profile、workspace 与 agents，默认 provider 为 MoE4All、endpoint 为 `http://127.0.0.1:1234/v1`、mode 为 connect，禁用默认 DeepSeek。已有隔离 profile 会保留；模型发现失败不应迫使用户启动引擎。初始化拒绝生产 `APPDATA/dsh-desktop/harness`、`~/.dsh` 等既有数据位置与不安全 reparse 路径。
+源码构建默认以 `harness/agent-state/` 为状态根目录；发行版 EXE 和 `Run-Agent.ps1` 的默认状态根目录为安装目录中的 `data/`。`Initialize-Agent.ps1` 在状态根目录下建立 `home/profiles/web`、`workspace` 与 `agents`，默认 provider 为 MoE4All、endpoint 为 `http://127.0.0.1:8080/v1`、mode 为 `prompt`，禁用默认 DeepSeek。下载引擎与启动推理进程是不同动作，准备好模型后仍需用户启动。已有隔离 profile 会保留；初始化拒绝生产 `APPDATA/dsh-desktop/harness`、`~/.dsh` 等既有数据位置与不安全 reparse 路径。
 
 `Run-Agent.ps1` 使用独立 `DSH_HOME`/`DSH_AGENTS_HOME`，默认 loopback Web 端口 17373，结束后恢复父进程环境；共享外部 workspace 需明确 `AllowSharedWorkspace`。这让开发入口与生产 DSH 分开，但还不能代替最终安装包的同机双运行验收。
 
@@ -49,6 +60,6 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 ## 发布边界
 
-tag 有 `Build-Agent.ps1`、`Initialize-Agent.ps1` 和 `Run-Agent.ps1`。后续分支的 preview EXE builder、完整应用更新器和浏览器测试结果不属于本 tag。默认 profile 中特定模型的 title/distill 覆盖仍需公开发行审查；“无凭据快照”不等于所有模型/机器都适用。
+`release-0.1.0-preview.3` 已包含桌面 EXE、首次启动引导、运行时准备、更新检查与 Windows CI 回归。CI 验证 bootstrap、移动后重启与插件装载，不下载大模型；导入本地 Engine、加载模型并完成真实对话仍属于发布前人工验收。默认 profile 中模型特化配置仍需公开发行审查；“无凭据快照”不等于所有模型或机器都适用。
 
-用户要求的整包更新确认、第三方服务主动开启、引擎/手机首次引导及快照迁移是[交付目标](../../roadmap/agent-distribution.md)。源码与改造出处见[迁移记录](../../evidence/changes/product/dsh-source-and-local-migration.md)。不将个人 IP、凭据、会话和记忆库作为发行默认值。
+整包更新必须由用户确认，第三方服务必须主动开启；引擎、手机连接与可选迁移的剩余验收见[交付目标](../../roadmap/agent-distribution.md)。源码与改造出处见[迁移记录](../../evidence/changes/product/dsh-source-and-local-migration.md)。不将个人 IP、凭据、会话和记忆库作为发行默认值。
