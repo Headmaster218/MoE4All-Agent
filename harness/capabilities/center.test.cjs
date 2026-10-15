@@ -157,7 +157,12 @@ test('prepared plugin is cold-switched only, then healthy rollback preserves use
   assert.deepEqual({ ...applied.lastUpdate, at: 0 }, { from: '1.0.0', to: '1.1.0', at: 0 });
   await f.center.check(true);
   assert.deepEqual((await f.center.snapshot()).plugins[0].lastUpdate, applied.lastUpdate);
-  await f.center.rollback(true); await f.center.apply();
+  await f.center.rollback(true);
+  const rollback = (await f.center.snapshot()).plugins[0];
+  assert.equal(rollback.preparedVersion, '1.0.0');
+  assert.equal(rollback.pendingAction, 'rollback');
+  await f.center.apply();
+  assert.deepEqual({ ...(await f.center.snapshot()).plugins[0].lastUpdate, at: 0 }, { from: '1.1.0', to: '1.0.0', at: 0, kind: 'rollback' });
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
   assert.equal(await fs.readFile(path.join(f.directory, 'cordis.patch.yml'), 'utf8'), 'user-owned: untouched\n');
 });
@@ -169,6 +174,18 @@ test('old Engine Manager is an installation prerequisite, not an installation er
   assert.equal(f.center.state.engine.managerUpdateRequired, true);
   assert.equal(f.center.state.engine.error, '');
   assert.equal(f.center.state.engine.canInstall, false);
+});
+
+test('an incomplete latest Engine release remains a visible check failure, not a silent missing installation', async () => {
+  const f = await fixture({ engineFetch: async url => Response.json(url.includes('/status') ? { mode: 'prompt', owned: false }
+    : { supported: true, confirmedReleaseTag: true, install: { stage: 'idle' }, ...(url.includes('force=1') ? { message: 'The latest release has no Windows ZIP asset.' } : {}) }) });
+  await f.center.checkEngine(true);
+  assert.equal(f.center.state.engine.phase, 'error');
+  assert.match(f.center.state.engine.error, /no Windows ZIP/);
+  await f.center.checkEngine(false);
+  assert.match(f.center.state.engine.error, /no Windows ZIP/);
+  await f.center.bootstrapEngine();
+  assert(!f.center.state.engineBootstrapAttempted);
 });
 
 test('unconfirmed startup and interruption at every rename restore the original profile', async () => {

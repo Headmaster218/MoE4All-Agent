@@ -131,9 +131,11 @@ class CapabilityCenter {
         latestVersion: candidate?.version ?? '', releaseUrl: candidate?.url ?? 'https://github.com/' + item.repository + '/releases',
         updateAvailable: !reason && !!candidate && this.tool('semver').gt(candidate.version, installedVersion),
         phase: operation?.phase ?? row.phase ?? 'idle', error: reason || operation?.error || row.error || '',
+        errorStage: operation?.error ? 'update' : reason || row.error ? 'check' : undefined,
         completed: operation?.completed ?? 0, total: operation?.total ?? 0,
         pending: operation?.phase === 'ready', rollbackAvailable: !!this.state.rollback && this.state.rollback.component === item.id,
-        checkedAt: row.checkedAt ?? 0, lastUpdate: row.lastUpdate ?? null });
+        checkedAt: row.checkedAt ?? 0, lastUpdate: row.lastUpdate ?? null,
+        preparedVersion: operation?.version ?? '', pendingAction: operation?.action ?? 'update' });
     }
     return { schema: 'moe4all/capabilities/v1', settings: this.settings, plugins, engine: this.state.engine, checking: !!this.checking,
       operation: this.state.operation, pending: !!this.state.operation && ['ready', 'applying', 'awaiting-health'].includes(this.state.operation.phase) };
@@ -200,9 +202,10 @@ class CapabilityCenter {
       const runtime = await this.engineRequest('/api/moe4all/status');
       const canInstall = result.supported && result.confirmedReleaseTag === true
         && (result.managed || (!runtime.executable && !result.installed && runtime.mode !== 'connect'));
+      const checkError = result.message || (!refresh && !result.latest ? this.state.engine?.checkError : '') || '';
       this.state.engine = { ...result, runtime, canInstall, checkedAt: refresh ? Date.now() : this.state.engine.checkedAt,
-        phase: result.install?.stage ?? 'idle', error: result.install?.error
-          || '', managerUpdateRequired: result.supported && result.confirmedReleaseTag !== true };
+        checkError, phase: checkError && (!result.install || result.install.stage === 'idle') ? 'error' : result.install?.stage ?? 'idle',
+        error: result.install?.error || checkError, managerUpdateRequired: result.supported && result.confirmedReleaseTag !== true };
     } catch (error) { this.state.engine = { phase: 'error', error: errorText(error), supported: false }; }
   }
 
@@ -346,8 +349,12 @@ class CapabilityCenter {
       if (!transaction) return this.snapshot();
       if (['applying', 'awaiting-health', 'rollback-requested'].includes(transaction.phase)) {
         if (transaction.phase === 'rollback-requested') assert.deepEqual(await identity(this.profile, this.catalog), transaction.after, 'Profile changed since update; refusing to overwrite user changes');
+        const requested = transaction.phase === 'rollback-requested';
         await profileTools.restore(this.profile, transaction, this.journalPath);
-        this.state.operation = { component: transaction.component, version: transaction.version, phase: 'rolled-back', error: '' };
+        const restoredVersion = transaction.base.versions[transaction.component];
+        this.state.operation = { component: transaction.component, version: restoredVersion, phase: 'rolled-back', error: '' };
+        if (requested) this.state.plugins[transaction.component] = { ...this.state.plugins[transaction.component], phase: 'current', error: '',
+          lastUpdate: { from: transaction.version, to: restoredVersion, at: Date.now(), kind: 'rollback' } };
         this.state.rollback = null;
         return this.emit();
       }
@@ -399,7 +406,7 @@ class CapabilityCenter {
       assert(transaction?.phase === 'applied', 'No plugin rollback is available');
       assert.deepEqual(await identity(this.profile, this.catalog), transaction.after, 'Profile changed since update; refusing to overwrite user changes');
       transaction.phase = 'rollback-requested'; await writeJson(this.journalPath, transaction);
-      this.state.operation = { id: transaction.id, component: transaction.component, version: transaction.version, phase: 'ready', error: '' };
+      this.state.operation = { id: transaction.id, component: transaction.component, version: transaction.base.versions[transaction.component], action: 'rollback', phase: 'ready', error: '' };
       return this.emit();
     });
   }

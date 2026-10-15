@@ -152,6 +152,11 @@ internal static partial class MoE4All
                             BeginCapabilityAction("check --automatic", true);
                         }
                     }
+                    else if (command.StartsWith("settings ", StringComparison.Ordinal) && result == 0)
+                    {
+                        StartUpdateAction("Check", false);
+                        BeginCapabilityAction("check --force", true);
+                    }
                 }));
             });
             worker.IsBackground = true; worker.Name = "MoE4All capability center"; worker.Start();
