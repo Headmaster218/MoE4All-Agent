@@ -36,9 +36,9 @@ internal static class MoE4All
     private static class Presentation
     {
         public static string Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "zh" ? "zh" : "en";
-        public static string Theme = "gray";
-        public static string Preference = "gray";
-        public static string DarkPreference = "gray";
+        public static string Theme = "green";
+        public static string Preference = "green";
+        public static string DarkPreference = "green";
         private static readonly Dictionary<string, string[]> Copy = new Dictionary<string, string[]>();
 
         static Presentation()
@@ -447,10 +447,13 @@ internal static class MoE4All
         Application.SetCompatibleTextRenderingDefault(false);
         using (AgentWindow testWindow = new AgentWindow(root, false))
         {
+            if (Presentation.Theme != "green" || Presentation.Preference != "green")
+                throw new InvalidOperationException("A new MoE4All Agent installation must default to the green palette.");
             testWindow.ShowInTaskbar = false;
             testWindow.Opacity = 0;
             testWindow.Show();
             Application.DoEvents();
+            testWindow.ValidateStartupSurfaceForTest();
             Size[] sizes = { new Size(760, 520), new Size(1024, 640), new Size(1280, 760) };
             string screenshotDirectory = Path.Combine(root, "screenshots");
             Directory.CreateDirectory(screenshotDirectory);
@@ -1487,7 +1490,15 @@ internal static class MoE4All
                         && !(uri.Scheme == "http" && uri.Host == "127.0.0.1" && uri.Port == WebPort))
                     { e.Cancel = true; if (uri.Scheme == "https" || uri.Scheme == "http") OpenUrl(e.Uri); }
                 };
-                webView.CoreWebView2.NavigationCompleted += delegate { if (!ready) { bootstrapLoaded = true; PushStartupState(); } else PublishDesktopState(false); };
+                webView.CoreWebView2.NavigationCompleted += delegate(object sender, CoreWebView2NavigationCompletedEventArgs e)
+                {
+                    if (!ready || !e.IsSuccess) return;
+                    Uri current;
+                    if (!Uri.TryCreate(webView.CoreWebView2.Source, UriKind.Absolute, out current)
+                        || current.Scheme != "http" || current.Host != "127.0.0.1" || current.Port != WebPort) return;
+                    ShowAgentSurface();
+                    PublishDesktopState(false);
+                };
                 ShowBootstrap();
             }
             catch (Exception error)
@@ -1498,11 +1509,9 @@ internal static class MoE4All
         }
         private void ShowBootstrap()
         {
-            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("MoE4All.Startup.html"))
-            using (StreamReader reader = new StreamReader(stream)) webView.CoreWebView2.NavigateToString(reader.ReadToEnd().Replace("/*INITIAL_STATE*/", "window.setState(" + StartupStateJson() + ");"));
-            startup.Visible = false;
-            webView.Visible = true;
-            webView.BringToFront();
+            bootstrapLoaded = false;
+            webView.Visible = false;
+            startup.Visible = true;
         }
         private async void ActivateWebView()
         {
@@ -1511,6 +1520,12 @@ internal static class MoE4All
             bootstrapLoaded = false;
             desktopBridgeReady = false;
             webView.Source = new Uri("http://127.0.0.1:" + WebPort + "/");
+        }
+        private void ShowAgentSurface()
+        {
+            startup.Visible = false;
+            webView.Visible = true;
+            webView.BringToFront();
         }
         private async void PushStartupState()
         {
@@ -1544,6 +1559,13 @@ internal static class MoE4All
             int actual;
             if (DwmGetWindowAttribute(Handle, 35, out actual, 4) == 0 && actual != ColorTranslator.ToWin32(Presentation.ColorFor("base")))
                 throw new InvalidOperationException("The native title bar does not match the selected palette.");
+        }
+
+        public void ValidateStartupSurfaceForTest()
+        {
+            ShowBootstrap();
+            if (!startup.Visible || webView.Visible)
+                throw new InvalidOperationException("The native startup page must remain visible until the Agent page is ready.");
         }
 
         [DllImport("dwmapi.dll")]
