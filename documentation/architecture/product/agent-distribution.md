@@ -52,7 +52,7 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 ## 本地 main 收敛
 
-2026-10-15 的本地验收标识为 `0.1.0-preview.4.local.3`，不代表已发布版本。Agent 本体、DSH 与全部维护插件均已收敛到各自本地 main；历史功能分支保留用于追溯，不再作为构建时的隐式版本来源。
+2026-10-15 的本地验收标识为 `0.1.0-preview.4.local.4`，不代表已发布版本。Agent 本体、DSH 与全部维护插件均已收敛到各自本地 main；历史功能分支保留用于追溯，不再作为构建时的隐式版本来源。
 
 - DSH main 为 `f34e950`，保留品牌、桌面适配、中英、四套主题、默认绿色和 4000 bytes 终端输出预算。
 - Provider main 的合并提交为 `db4b3fa`，随后 `24667a9` 补齐设置异步加载时的更新提示订阅；同时包含独立插件 `0.2.2` 主线及 Agent 定制线。保留 DSH 0.1/0.2 设置和 provider 兼容、地址校验、请求超时、独立插件更新校验与回滚，以及 Agent 文件选择、稳定模型目录、双 slot 默认值、embedding 衔接、思考控件和通用失败建议。
@@ -61,6 +61,7 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 - 其他七个插件的实际 gitlink 与上表一致；其中六个将远端 release 分支的完整提交快进纳入本地 main，Brave 本来就与 main 一致，无须制造新提交。
 - profile manifest 和 lock 同步到 Provider `0.2.2` 的新 runtime 及依赖，构建使用提交固定的组合，不自动跟踪远端最新分支。
 - `4b7be2e` 修正实际整包配色检查发现的输入占位文字对比度问题，使用宿主主题的 secondary 文字色且不降低透明度。
+- 整包核对进一步复现了同版本、同名 tarball 更新后 hoisted profile 仍使用旧文件的问题。构建现改为内容摘要依赖标识，并逐文件验证提交源码、archive 与已安装插件；当前八个内置插件共核对 621 个发布文件。版本号、gitlink 和 lockfile 正确不再被当作运行文件正确的替代证据。
 
 本次不修改、构建或启动独立 Engine 仓库；GPU 推理与生产后端不属于这次分支收敛的验收范围。
 

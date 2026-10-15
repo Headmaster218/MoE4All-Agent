@@ -13,6 +13,8 @@ Agent 与 Engine 分别版本化。Agent Windows 包包含桌面壳、Node、DSH
 
 修改插件后先提交插件源码及 runtime，再运行 `harness/scripts/Build-Agent.ps1 -UpdateProfileLock`，审查并提交 profile lock。
 lock 维护会从插件的 Git commit 打包，明确关闭 Git archive 的 autocrlf 转换。
+所有构建模式均使用内容摘要命名的插件 tarball，代码变更即改变依赖标识，不能依赖同版本、同名 tarball 的 `--force` 安装来刷新 hoisted profile。
+安装后逐文件核对提交源码、锁定 archive 与实际 `node_modules`，拒绝指针正确但运行文件仍旧的缓存。复用 prebuilt profile 也必须通过该检查。
 发行包使用子模块里已提交、验收过的插件 runtime，不在发行阶段重新生成 sourcemap；
 修改插件时需先完成源码构建和测试，再提交 runtime 与源码。
 发布构建使用 `-Release` 与 frozen lock，不执行依赖自动升级。
@@ -42,5 +44,8 @@ $version = (Get-Content ./harness/distribution/agent-build.json -Raw | ConvertFr
 
 `harness/distribution/agent-release.json` 是生成的构建来源清单，不作为源码提交。
 使用 `-PrebuiltHarnessRoot` 时，构建器校验其中的 DSH、插件提交、profile lock SHA256 与运行时版本，不能直接复用旧版本目录。
-`0.1.0-preview.4.local.3` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。
+`0.1.0-preview.4.local.4` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。
 更新器识别 `preview.N.local.M`，同一 preview 下按 local 编号递增，后续更高 preview 或正式版仍能正常更新。
+
+只更新内置插件时，可使用 `-BaseArchive <已校验 ZIP> -RefreshProfileFromHarness <已构建 harness>`。
+此模式要求 DSH gitlink、Node/pnpm 固定版本和 DSH 构建入口不变；重新验证全部插件文件并生成新的 profile payload，保留已验证的 DSH/Node payload。来源清单分别记录 DSH 与 profile 的构建提交，不把旧 profile 当成新产物。

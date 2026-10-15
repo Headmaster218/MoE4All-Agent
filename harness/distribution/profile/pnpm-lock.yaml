@@ -12,29 +12,29 @@ importers:
   .:
     dependencies:
       dsh-easyrewrite-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-easyrewrite-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-0d65ef207a55ddd4.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-0d65ef207a55ddd4.tgz
       dsh-llm-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-llm-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-f8cb262dffe71fbe.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-f8cb262dffe71fbe.tgz
       dsh-market-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-market-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-market-moe4all-8acf83a4e06d1938.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-market-moe4all-8acf83a4e06d1938.tgz
       dsh-mneme-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-mneme-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-mneme-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-mneme-moe4all-679329fd2c9f2c7f.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-mneme-moe4all-679329fd2c9f2c7f.tgz
       dsh-plugin-cron-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-plugin-cron-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all-07ba82f0d9058e0c.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all-07ba82f0d9058e0c.tgz
       dsh-plugin-tts-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-plugin-tts-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all-70328e3103a56d88.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all-70328e3103a56d88.tgz
       dsh-remote-web-ui-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-remote-web-ui-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all-c19961872d6f7a0e.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all-c19961872d6f7a0e.tgz
       dsh-web-search-brave-moe4all:
-        specifier: file:..\..\..\..\runtime\plugin-packs\dsh-web-search-brave-moe4all.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all-e5ecbfd5cc5fdd17.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all-e5ecbfd5cc5fdd17.tgz
 
 packages:
 
@@ -63,12 +63,12 @@ packages:
   cosmokit@1.8.1:
     resolution: {integrity: sha512-PDBv4l90xZKrUsZ0vtoycgZpO/j4iFsqJXrAxsyBDsnQRI7ZMJXIjgDJsKNjd5L8jnVnnlrDCdhkFbTncgCVjQ==}
 
-  dsh-easyrewrite-moe4all@file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all.tgz:
-    resolution: {integrity: sha512-LDXJsKgkS1yQhSTvhTjBhJyh/QbWx+x0NTFyxEm2sSYHSTRY1nuwNbi8z7sn4aByLf1RsyZFXyFmpHCOmEKgGA==, tarball: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all.tgz}
+  dsh-easyrewrite-moe4all@file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-0d65ef207a55ddd4.tgz:
+    resolution: {integrity: sha512-LDXJsKgkS1yQhSTvhTjBhJyh/QbWx+x0NTFyxEm2sSYHSTRY1nuwNbi8z7sn4aByLf1RsyZFXyFmpHCOmEKgGA==, tarball: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-0d65ef207a55ddd4.tgz}
     version: 2.4.1-moe4all.1
 
-  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz:
-    resolution: {integrity: sha512-UAmu7xXN3xHxOgMaeW54KalYBBGcwzOFhcnQfV2T8PHSIOVR6Gkowwu9cS91nCwTVORn3KUaF409HmLcUv9Fhg==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz}
+  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-f8cb262dffe71fbe.tgz:
+    resolution: {integrity: sha512-UAmu7xXN3xHxOgMaeW54KalYBBGcwzOFhcnQfV2T8PHSIOVR6Gkowwu9cS91nCwTVORn3KUaF409HmLcUv9Fhg==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-f8cb262dffe71fbe.tgz}
     version: 0.2.2
     engines: {dsh: '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0', node: '>=20.3.0'}
     peerDependencies:
@@ -84,8 +84,8 @@ packages:
       '@deepseek-ai/schemastery': '>=3.18.1 <4'
       react: ^18.2.0
 
-  dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz:
-    resolution: {integrity: sha512-PEfkT8jlGS7HeQy+klXttaYzRC2EVzPLA8D2mJft6QMifS8Ha+1gHzB1w8z6XKPBMrm1Nvatzul+laDyhZJBMg==, tarball: file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz}
+  dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all-8acf83a4e06d1938.tgz:
+    resolution: {integrity: sha512-PEfkT8jlGS7HeQy+klXttaYzRC2EVzPLA8D2mJft6QMifS8Ha+1gHzB1w8z6XKPBMrm1Nvatzul+laDyhZJBMg==, tarball: file:../../../../runtime/plugin-packs/dsh-market-moe4all-8acf83a4e06d1938.tgz}
     version: 1.45.1-moe4all.1
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
@@ -97,8 +97,8 @@ packages:
       '@deepseek-ai/schemastery':
         optional: true
 
-  dsh-mneme-moe4all@file:../../../../runtime/plugin-packs/dsh-mneme-moe4all.tgz:
-    resolution: {integrity: sha512-qj8go5bG3yAGrFAOnm2r0JUuM+jCtPrghcdxCbRhLUoB/CWv6GK/acLhD8UR7tWLjsZbYTIlC5Q7epHAkcNuow==, tarball: file:../../../../runtime/plugin-packs/dsh-mneme-moe4all.tgz}
+  dsh-mneme-moe4all@file:../../../../runtime/plugin-packs/dsh-mneme-moe4all-679329fd2c9f2c7f.tgz:
+    resolution: {integrity: sha512-qj8go5bG3yAGrFAOnm2r0JUuM+jCtPrghcdxCbRhLUoB/CWv6GK/acLhD8UR7tWLjsZbYTIlC5Q7epHAkcNuow==, tarball: file:../../../../runtime/plugin-packs/dsh-mneme-moe4all-679329fd2c9f2c7f.tgz}
     version: 0.7.29-moe4all.1
     hasBin: true
     peerDependencies:
@@ -113,16 +113,16 @@ packages:
       dsh-better-sidebar:
         optional: true
 
-  dsh-plugin-cron-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all.tgz:
-    resolution: {integrity: sha512-kODBAKej8qWZL1ID4GF1JmBc12/jMD80gl2tZscZthVNFmSw4OWsbiLyWFYMli2WSHH5iuiSAqIm5eFtIbZwhQ==, tarball: file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all.tgz}
+  dsh-plugin-cron-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all-07ba82f0d9058e0c.tgz:
+    resolution: {integrity: sha512-kODBAKej8qWZL1ID4GF1JmBc12/jMD80gl2tZscZthVNFmSw4OWsbiLyWFYMli2WSHH5iuiSAqIm5eFtIbZwhQ==, tarball: file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all-07ba82f0d9058e0c.tgz}
     version: 0.2.7-moe4all.1
     engines: {node: '>=18'}
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
       '@deepseek-ai/schemastery': ^3.18.1
 
-  dsh-plugin-tts-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all.tgz:
-    resolution: {integrity: sha512-Q2KpWZzsdjDYyGLL220WxwLx2mTiXjqYVeCaBvoPRudHcKcbkGIfhufdzPlk2IIy08t7558QdRGPQrbsvof7OA==, tarball: file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all.tgz}
+  dsh-plugin-tts-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all-70328e3103a56d88.tgz:
+    resolution: {integrity: sha512-Q2KpWZzsdjDYyGLL220WxwLx2mTiXjqYVeCaBvoPRudHcKcbkGIfhufdzPlk2IIy08t7558QdRGPQrbsvof7OA==, tarball: file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all-70328e3103a56d88.tgz}
     version: 0.3.1-moe4all.1
     engines: {node: '>=22'}
     peerDependencies:
@@ -130,16 +130,16 @@ packages:
       '@deepseek-ai/dsh-web': '>=0.1.0-rc.6'
       react: ^18.2.0
 
-  dsh-remote-web-ui-moe4all@file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz:
-    resolution: {integrity: sha512-MiAtlkqUg24JFp0yPbw4jt+xAp2sf0aat7Ljg+fxijBbrYmWWrDlLjyWuC5sAbZJF8LLjkjciiLyvwSa1mt5sg==, tarball: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz}
+  dsh-remote-web-ui-moe4all@file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all-c19961872d6f7a0e.tgz:
+    resolution: {integrity: sha512-MiAtlkqUg24JFp0yPbw4jt+xAp2sf0aat7Ljg+fxijBbrYmWWrDlLjyWuC5sAbZJF8LLjkjciiLyvwSa1mt5sg==, tarball: file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all-c19961872d6f7a0e.tgz}
     version: 0.3.17-moe4all.1
     engines: {node: ^22.19.0 || >=24.0.0}
     peerDependencies:
       react: ^18.2.0
       react-dom: ^18.2.0
 
-  dsh-web-search-brave-moe4all@file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all.tgz:
-    resolution: {integrity: sha512-aPY0lb1U5LAwTB5o75++cy8Rv5iUgAX1sGuWWxo7gm+E8ola1MNwqUidqfZEhGBO2RlAef7reaMDDMP0q8fLvA==, tarball: file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all.tgz}
+  dsh-web-search-brave-moe4all@file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all-e5ecbfd5cc5fdd17.tgz:
+    resolution: {integrity: sha512-aPY0lb1U5LAwTB5o75++cy8Rv5iUgAX1sGuWWxo7gm+E8ola1MNwqUidqfZEhGBO2RlAef7reaMDDMP0q8fLvA==, tarball: file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all-e5ecbfd5cc5fdd17.tgz}
     version: 1.0.0-moe4all.1
     engines: {node: '>=18.17'}
     peerDependencies:
@@ -237,21 +237,21 @@ snapshots:
 
   cosmokit@1.8.1: {}
 
-  dsh-easyrewrite-moe4all@file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all.tgz: {}
+  dsh-easyrewrite-moe4all@file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-0d65ef207a55ddd4.tgz: {}
 
-  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz:
+  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-f8cb262dffe71fbe.tgz:
     dependencies:
       lucide-react: 0.468.0
       semver: 7.8.5
       tar: 7.5.22
       undici: 6.29.0
 
-  dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz:
+  dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all-8acf83a4e06d1938.tgz:
     dependencies:
       js-yaml: 4.3.2
       undici: 7.30.0
 
-  dsh-mneme-moe4all@file:../../../../runtime/plugin-packs/dsh-mneme-moe4all.tgz:
+  dsh-mneme-moe4all@file:../../../../runtime/plugin-packs/dsh-mneme-moe4all-679329fd2c9f2c7f.tgz:
     dependencies:
       '@huggingface/transformers': link:stubs/hf-transformers-stub
       morphicons: 1.7.1
@@ -262,11 +262,11 @@ snapshots:
       - svelte
       - vue
 
-  dsh-plugin-cron-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all.tgz: {}
+  dsh-plugin-cron-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-cron-moe4all-07ba82f0d9058e0c.tgz: {}
 
-  dsh-plugin-tts-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all.tgz: {}
+  dsh-plugin-tts-moe4all@file:../../../../runtime/plugin-packs/dsh-plugin-tts-moe4all-70328e3103a56d88.tgz: {}
 
-  dsh-remote-web-ui-moe4all@file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all.tgz:
+  dsh-remote-web-ui-moe4all@file:../../../../runtime/plugin-packs/dsh-remote-web-ui-moe4all-c19961872d6f7a0e.tgz:
     dependencies:
       cloudflared: 0.7.3
       clsx: 2.1.1
@@ -274,7 +274,7 @@ snapshots:
       schemastery: 3.18.0
       zod: 4.6.7
 
-  dsh-web-search-brave-moe4all@file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all.tgz: {}
+  dsh-web-search-brave-moe4all@file:../../../../runtime/plugin-packs/dsh-web-search-brave-moe4all-e5ecbfd5cc5fdd17.tgz: {}
 
   js-yaml@4.3.2:
     dependencies:

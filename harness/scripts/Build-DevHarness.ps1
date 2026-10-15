@@ -151,11 +151,7 @@ try {
         if (-not (Test-Path -LiteralPath $contentPack -PathType Leaf)) {
             Copy-Item -LiteralPath $stablePack -Destination $contentPack
         }
-        if ($Release -or $UpdateProfileLock) {
-            $packedDependencies[$pluginName] = "file:..\..\..\..\runtime\plugin-packs\$pluginName.tgz"
-        } else {
-            $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName-$digest.tgz"
-        }
+        $packedDependencies[$pluginName] = "file:../../../../runtime/plugin-packs/$pluginName-$digest.tgz"
     }
 
     $manifestPath = Join-Path $devProfile 'package.json'
@@ -183,6 +179,10 @@ try {
     } finally {
         Pop-Location
     }
+    $verifyArgs = @((Join-Path $PSScriptRoot 'Verify-AgentProfile.cjs'), $harnessRoot, $devProfile)
+    if (-not $Release -and -not $UpdateProfileLock) { $verifyArgs += '--development' }
+    & $node @verifyArgs
+    if ($LASTEXITCODE -ne 0) { throw 'The installed plugin runtime differs from its committed package archives.' }
 } finally {
     $env:PATH = $oldPath
     if ($null -eq $oldCi) { Remove-Item Env:CI -ErrorAction SilentlyContinue } else { $env:CI = $oldCi }

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$HarnessRoot)
+param([Parameter(Mandatory = $true)][string]$HarnessRoot, [switch]$RefreshProfile)
 
 $ErrorActionPreference = 'Stop'
 $harness = [IO.Path]::GetFullPath($HarnessRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
@@ -28,17 +28,28 @@ if (Test-Path -LiteralPath $manifestPath) {
             throw 'The reused runtime payload is invalid.'
         }
     }
-    return
+    if (-not $RefreshProfile) { return }
+    $archives = @($manifest.archives | Where-Object { $_.root -ne 'distribution\prebuilt-state' })
+    if ($archives.Count -ne 2 -or -not ($archives | Where-Object { $_.root -eq 'runtime\dsh' }) -or
+        -not ($archives | Where-Object { $_.root -match '^runtime\\node-v[0-9.]+-win-x64$' })) {
+        throw 'Profile refresh requires verified DSH and Node payloads.'
+    }
+    $oldProfile = Join-Path $harness 'distribution\profile-data.zip'
+    if (-not $oldProfile.StartsWith($harness + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Profile payload escapes staging.' }
+    Remove-Item -LiteralPath $oldProfile -Force
+    $groups = @(@{ root='distribution\prebuilt-state'; file='distribution\profile-data.zip'; keep=$null })
+} else {
+    if ($RefreshProfile) { throw 'A profile refresh requires an existing runtime payload manifest.' }
+    $nodeDirectory = Get-ChildItem -LiteralPath (Join-Path $harness 'runtime') -Directory -Filter 'node-v*-win-x64' | Select-Object -First 1
+    if (-not $nodeDirectory) { throw 'The bundled Node runtime is missing.' }
+    $groups = @(
+        @{ root='runtime\dsh'; file='runtime\dsh-data.zip'; keep=$null },
+        @{ root='distribution\prebuilt-state'; file='distribution\profile-data.zip'; keep=$null },
+        @{ root=('runtime\' + $nodeDirectory.Name); file='runtime\node-data.zip'; keep=$null }
+    )
+    $archives = @()
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$nodeDirectory = Get-ChildItem -LiteralPath (Join-Path $harness 'runtime') -Directory -Filter 'node-v*-win-x64' | Select-Object -First 1
-if (-not $nodeDirectory) { throw 'The bundled Node runtime is missing.' }
-$groups = @(
-    @{ root='runtime\dsh'; file='runtime\dsh-data.zip'; keep=$null },
-    @{ root='distribution\prebuilt-state'; file='distribution\profile-data.zip'; keep=$null },
-    @{ root=('runtime\' + $nodeDirectory.Name); file='runtime\node-data.zip'; keep=$null }
-)
-$archives = @()
 foreach ($group in $groups) {
     $source = [IO.Path]::GetFullPath((Join-Path $harness $group.root))
     if (-not $source.StartsWith($harness + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime source escapes staging.' }

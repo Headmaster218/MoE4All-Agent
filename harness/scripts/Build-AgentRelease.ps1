@@ -6,7 +6,8 @@ param(
     [string]$OutputDirectory,
     [string]$EngineExecutable,
     [string]$PrebuiltHarnessRoot,
-    [string]$BaseArchive
+    [string]$BaseArchive,
+    [string]$RefreshProfileFromHarness
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,7 @@ $output = [IO.Path]::GetFullPath($OutputDirectory)
 $engineExe = $null
 $engineVersion = $null
 $engineTag = $null
+if ($RefreshProfileFromHarness -and -not $BaseArchive) { throw 'Profile refresh requires a verified base archive.' }
 $assetVersion = $Version -replace '^release-', 'v'
 $name = "MoE4All-Agent-Windows-x64-$assetVersion"
 $stage = Join-Path $output $name
@@ -106,7 +108,9 @@ if ($BaseArchive) {
     }
     & git -C $root cat-file -e ($baseCommit + '^{commit}')
     if ($LASTEXITCODE -ne 0) { throw 'The base source commit is not available for verification.' }
-    $runtimePaths = @($submodules) + @('harness/distribution/profile')
+    $runtimePaths = if ($RefreshProfileFromHarness) {
+        @('harness/dsh', 'harness/distribution/runtime-versions.json', 'harness/scripts/Build-Agent.ps1')
+    } else { @($submodules) + @('harness/distribution/profile') }
     & git -C $root diff --quiet $baseCommit HEAD -- @runtimePaths
     if ($LASTEXITCODE -ne 0) { throw 'Runtime submodules or profile changed; perform a full release build.' }
 
@@ -149,7 +153,51 @@ if ($BaseArchive) {
     $baseManifest | Add-Member -NotePropertyName basePackageVersion -NotePropertyValue $baseVersion -Force
     [IO.File]::WriteAllText((Join-Path $stageHarness 'distribution\agent-release.json'),
         (($baseManifest | ConvertTo-Json) + "`n"), (New-Object Text.UTF8Encoding($false)))
-    & (Join-Path $PSScriptRoot 'Pack-AgentRuntime.ps1') -HarnessRoot $stageHarness
+    if ($RefreshProfileFromHarness) {
+        $profileHarness = [IO.Path]::GetFullPath($RefreshProfileFromHarness)
+        $profileSource = Join-Path $profileHarness 'agent-state\home\profiles\web'
+        $profileNode = Join-Path $profileHarness "runtime\node-v$($baseManifest.runtimeVersions.node)-win-x64\node.exe"
+        $canonicalLock = Join-Path $root 'harness\distribution\profile\pnpm-lock.yaml'
+        if ((Get-FileHash (Join-Path $profileHarness 'distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash -ne
+            (Get-FileHash $canonicalLock -Algorithm SHA256).Hash) { throw 'The refreshed profile uses a different dependency lock.' }
+        & $profileNode (Join-Path $PSScriptRoot 'Verify-AgentProfile.cjs') $profileHarness $profileSource
+        if ($LASTEXITCODE -ne 0) { throw 'Refreshed plugins do not match the committed archives.' }
+        foreach ($relative in $submodules) {
+            if ((& git -C (Join-Path $profileHarness ($relative -replace '^harness/', '')) rev-parse HEAD).Trim() -ne
+                ((& git -C (Join-Path $root $relative) rev-parse HEAD).Trim())) { throw "Refreshed source pin differs: $relative" }
+        }
+        $profileInput = Join-Path $output ($name + '-profile-input')
+        $profileArchive = Join-Path $output ($name + '-profile-input.zip')
+        & git -c core.autocrlf=false -C $root archive --format=zip "--output=$profileArchive" HEAD harness/distribution/profile harness/distribution/agent-build.json
+        if ($LASTEXITCODE -ne 0) { throw 'Archiving the refreshed profile failed.' }
+        [IO.Compression.ZipFile]::ExtractToDirectory($profileArchive, $profileInput)
+        $oldTemplate = [IO.Path]::GetFullPath((Join-Path $stageHarness 'distribution\profile'))
+        if (-not $oldTemplate.StartsWith($stageHarness + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Profile template escapes staging.' }
+        Remove-Item -LiteralPath $oldTemplate -Recurse -Force
+        Copy-Item -LiteralPath (Join-Path $profileInput 'harness\distribution\profile') -Destination $oldTemplate -Recurse
+        Copy-Item -LiteralPath (Join-Path $profileInput 'harness\distribution\agent-build.json') -Destination (Join-Path $stageHarness 'distribution\agent-build.json') -Force
+        & (Join-Path $root 'harness\scripts\Initialize-Agent.ps1') -StateRoot (Join-Path $stageHarness 'agent-state')
+        $targetProfile = Join-Path $stageHarness 'agent-state\home\profiles\web'
+        & robocopy (Join-Path $profileSource 'node_modules') (Join-Path $targetProfile 'node_modules') /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { throw 'Copying refreshed plugin modules failed.' }
+        foreach ($file in @('package.json', 'pnpm-lock.yaml')) {
+            Copy-Item -LiteralPath (Join-Path $profileSource $file) -Destination (Join-Path $targetProfile $file) -Force
+        }
+        & $profileNode (Join-Path $PSScriptRoot 'Verify-AgentProfile.cjs') $profileHarness $targetProfile
+        if ($LASTEXITCODE -ne 0) { throw 'Copied profile failed plugin runtime verification.' }
+        $seed = [IO.Path]::GetFullPath((Join-Path $stageHarness 'distribution\prebuilt-state'))
+        if (-not $seed.StartsWith($stageHarness + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Profile seed escapes staging.' }
+        if (Test-Path -LiteralPath $seed) { Remove-Item -LiteralPath $seed -Recurse -Force }
+        Move-Item -LiteralPath (Join-Path $stageHarness 'agent-state') -Destination $seed
+        $baseManifest.PSObject.Properties.Remove('runtimeSourceCommit')
+        $baseManifest | Add-Member -NotePropertyName dshRuntimeSourceCommit -NotePropertyValue $runtimeSourceCommit -Force
+        $baseManifest | Add-Member -NotePropertyName profileSourceCommit -NotePropertyValue $rootCommit -Force
+        $baseManifest.profileLockSha256 = (Get-FileHash (Join-Path $stageHarness 'distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
+        $baseManifest.submodules = @($submodules | ForEach-Object { [ordered]@{ path=$_; commit=(& git -C (Join-Path $root $_) rev-parse HEAD).Trim() } })
+        [IO.File]::WriteAllText((Join-Path $stageHarness 'distribution\agent-release.json'),
+            (($baseManifest | ConvertTo-Json -Depth 8) + "`n"), (New-Object Text.UTF8Encoding($false)))
+    }
+    & (Join-Path $PSScriptRoot 'Pack-AgentRuntime.ps1') -HarnessRoot $stageHarness -RefreshProfile:([bool]$RefreshProfileFromHarness)
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $archive, [IO.Compression.CompressionLevel]::Optimal, $true)
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
     [IO.File]::WriteAllText($checksum, "$hash  $([IO.Path]::GetFileName($archive))`n", (New-Object Text.UTF8Encoding($false)))
@@ -173,6 +221,7 @@ $agentPaths = @(
     'harness/scripts/AgentUpdateVersion.ps1',
     'harness/scripts/Build-Agent.ps1',
     'harness/scripts/Build-DevHarness.ps1',
+    'harness/scripts/Verify-AgentProfile.cjs',
     'harness/scripts/Check-AgentUpdate.ps1',
     'harness/scripts/Initialize-Agent.ps1',
     'harness/scripts/Prepare-BundledRuntime.ps1',
@@ -207,7 +256,7 @@ $manifest = [ordered]@{
     dshCommit = $dshCommit
     engineVersion = $engineTag
     runtimeVersions = (Get-Content -LiteralPath (Join-Path $root 'harness\distribution\runtime-versions.json') -Raw | ConvertFrom-Json)
-    profileLockSha256 = (Get-FileHash -LiteralPath (Join-Path $root 'harness\distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
+    profileLockSha256 = (Get-FileHash -LiteralPath (Join-Path $stageHarness 'distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
     submodules = @($submodules | ForEach-Object { [ordered]@{ path = $_; commit = (& git -C (Join-Path $root $_) rev-parse HEAD).Trim() } })
 }
 $manifestPath = Join-Path $stageHarness 'distribution\agent-release.json'
@@ -239,6 +288,10 @@ if ($PrebuiltHarnessRoot) {
         $builtPin = @($prebuiltManifest.submodules | Where-Object { $_.path -eq $pin.path })
         if ($builtPin.Count -ne 1 -or $builtPin[0].commit -ne $pin.commit) { throw "Prebuilt submodule differs from release: $($pin.path)" }
     }
+    $verifyNode = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Directory -Filter 'node-v*-win-x64' |
+        ForEach-Object { Join-Path $_.FullName 'node.exe' } | Select-Object -First 1
+    & $verifyNode (Join-Path $PSScriptRoot 'Verify-AgentProfile.cjs') $buildHarness (Join-Path $buildHarness 'agent-state\home\profiles\web')
+    if ($LASTEXITCODE -ne 0) { throw 'Prebuilt plugins do not match the pinned archives; rebuild the profile.' }
     & (Join-Path $stageHarness 'scripts\Initialize-Agent.ps1') -StateRoot (Join-Path $stageHarness 'agent-state')
     $builtProfile = Join-Path $buildHarness 'agent-state\home\profiles\web'
     $stageProfile = Join-Path $stageHarness 'agent-state\home\profiles\web'
@@ -437,7 +490,7 @@ foreach ($path in $removePaths) {
 }
 Get-ChildItem -LiteralPath $stageRuntime -File -Filter 'node-v*-win-x64.zip' -ErrorAction SilentlyContinue |
     Remove-Item -Force
-foreach ($scriptName in @('Build-Agent.ps1', 'Build-DevHarness.ps1', 'Initialize-Agent.ps1')) {
+foreach ($scriptName in @('Build-Agent.ps1', 'Build-DevHarness.ps1', 'Initialize-Agent.ps1', 'Verify-AgentProfile.cjs')) {
     $path = Join-Path $stageHarness "scripts\$scriptName"
     if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
 }

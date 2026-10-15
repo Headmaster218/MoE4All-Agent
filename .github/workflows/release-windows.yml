@@ -54,6 +54,7 @@ jobs:
           & $node --test harness/scripts/Test-BundledRuntime.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed.' }
           ./harness/scripts/Test-AgentUpdateVersion.ps1
+          ./harness/scripts/Test-AgentProfilePayload.ps1
           ./harness/scripts/Test-AgentUpdate.ps1
           ./harness/scripts/Test-AgentUpdate.ps1 -LegacyTags
           ./harness/scripts/Test-AgentLauncher.ps1
@@ -61,6 +62,11 @@ jobs:
         run: |
           $zip = Get-ChildItem artifacts/agent-release -Filter '*.zip' | Select-Object -First 1
           ./harness/scripts/Test-AgentRelease.ps1 -Archive $zip.FullName
+          $runs = @(Get-Content artifacts/release-smoke/startup.json -Raw | ConvertFrom-Json)
+          $env:MOE4ALL_TEST_PROFILE = Join-Path $runs[-1].install 'data\home\profiles\web'
+          $node = Join-Path $runs[-1].install 'node.exe'
+          & $node --test harness/scripts/Test-AgentProfile.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Plugin archive provenance regression tests failed.' }
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ${{ !cancelled() }}
         with:
