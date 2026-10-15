@@ -21,8 +21,8 @@ DSH 部署使用 pnpm shared-lockfile deploy（仅在部署阶段启用 workspac
 
 ## 发布流程
 
-1. 在 main 更新 `harness/distribution/agent-build.json` 和发行说明，提交子模块指针及 lockfile。
-2. 对 main 中的提交创建 `release-<version>` 标签并 push。CI 拒绝版本不符或不属于 main 的提交。
+1. 先在各子仓 main 收敛功能和修复，完成测试及 runtime 构建。本地验收可以暂不 push；正式发布前必须先 push 子仓 main，并确认其包含 Agent 要引用的提交。
+2. 在 Agent main 更新 `harness/distribution/agent-build.json` 和发行说明，提交子模块指针及 lockfile。确认远端能获取所有固定子仓提交后，再 push Agent main 和 `release-<version>` 标签。CI 拒绝版本不符或不属于 main 的提交。
 3. CI 构建 ZIP 和 SHA256，运行 bootstrap、updater、EXE 回归检查，并从 ZIP 测试全新启动及移动后的重启。
 4. CI 创建草稿 release。下载 CI 的原始资产，验证 SHA256，再用真实桌面 EXE 导入本地 Engine、加载已有模型并完成对话。
 5. 验收通过后将草稿公开。预览标签包含 `-preview.N`，发布为 prerelease。
@@ -33,8 +33,13 @@ CI 不下载大模型，也不宣称 GPU 推理已验收。最终模型对话属
 ## 本地构建
 
 ```powershell
-./harness/scripts/Build-AgentRelease.ps1 -Version release-0.1.0-preview.3
-./harness/scripts/Test-AgentRelease.ps1 -Archive ./artifacts/agent-release/MoE4All-Agent-Windows-x64-v0.1.0-preview.3.zip
+$version = (Get-Content ./harness/distribution/agent-build.json -Raw | ConvertFrom-Json).version
+./harness/scripts/Build-AgentRelease.ps1 -Version "release-$version"
+./harness/scripts/Test-AgentRelease.ps1 -Archive "./artifacts/agent-release/MoE4All-Agent-Windows-x64-v$version.zip"
 ```
 
 源码及子模块必须干净且匹配提交指针。不要把开发 profile、生产 DSH 数据或本机绝对路径复制进发行包。
+
+`harness/distribution/agent-release.json` 是生成的构建来源清单，不作为源码提交。
+使用 `-PrebuiltHarnessRoot` 时，构建器校验其中的 DSH、插件提交、profile lock SHA256 与运行时版本，不能直接复用旧版本目录。
+`0.1.0-preview.4.local.1` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。

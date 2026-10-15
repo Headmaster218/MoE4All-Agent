@@ -50,6 +50,19 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 随后本地修订移除了插件的日志自动分类与一槽重试入口。当前启动失败界面保留原始错误和日志，统一提供降低并发、降低上下文、切换稳健自动或激进自动策略、选择更小模型四类常见调整建议；调整由用户在设置中完成。后端结构化错误、启动管理通道、临时降级与恢复策略仍处于讨论阶段。
 
+## 本地 main 收敛
+
+2026-10-15 的本地验收标识为 `0.1.0-preview.4.local.1`，不代表已发布版本。Agent 本体、DSH 与全部维护插件均已收敛到各自本地 main；历史功能分支保留用于追溯，不再作为构建时的隐式版本来源。
+
+- DSH main 为 `f34e950`，保留品牌、桌面适配、中英、四套主题、默认绿色和 4000 bytes 终端输出预算。
+- Provider main 的合并提交为 `db4b3fa`，同时包含独立插件 `0.2.2` 主线及 Agent 定制线。保留 DSH 0.1/0.2 设置和 provider 兼容、地址校验、请求超时、独立插件更新校验与回滚，以及 Agent 文件选择、稳定模型目录、双 slot 默认值、embedding 衔接、思考控件和通用失败建议。
+- 内置 Provider 的自更新提示、手动入口和实际更新目标均受整包模式限制；独立安装模式继续保留主线插件自更新与首次引擎准备流程。引擎更新与插件更新仍是两条独立通道，均不等于启动推理。
+- 并发默认值为 2，同时保留主线提供的 1 至 4 slot 设置范围。合并不恢复日志推断、自动降级或一槽重试。
+- 其他七个插件的实际 gitlink 与上表一致；其中六个将远端 release 分支的完整提交快进纳入本地 main，Brave 本来就与 main 一致，无须制造新提交。
+- profile manifest 和 lock 同步到 Provider `0.2.2` 的新 runtime 及依赖，构建使用提交固定的组合，不自动跟踪远端最新分支。
+
+本次不修改、构建或启动独立 Engine 仓库；GPU 推理与生产后端不属于这次分支收敛的验收范围。
+
 ## 数据与运行隔离
 
 源码构建默认以 `harness/agent-state/` 为状态根目录；发行版 EXE 和 `Run-Agent.ps1` 的默认状态根目录为安装目录中的 `data/`。`Initialize-Agent.ps1` 在状态根目录下建立 `home/profiles/web`、`workspace` 与 `agents`，默认 provider 为 MoE4All、endpoint 为 `http://127.0.0.1:8080/v1`、mode 为 `prompt`，禁用默认 DeepSeek。下载引擎与启动推理进程是不同动作，准备好模型后仍需用户启动。已有隔离 profile 会保留；初始化拒绝生产 `APPDATA/dsh-desktop/harness`、`~/.dsh` 等既有数据位置与不安全 reparse 路径。

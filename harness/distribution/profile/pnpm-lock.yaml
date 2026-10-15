@@ -38,11 +38,19 @@ importers:
 
 packages:
 
+  '@isaacs/fs-minipass@4.0.1':
+    resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
+    engines: {node: '>=18.0.0'}
+
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
+  chownr@3.0.0:
+    resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
+    engines: {node: '>=18'}
 
   cloudflared@0.7.3:
     resolution: {integrity: sha512-dR4QMS4PbD287QqOV/vAoE1BcQCXphLOVrN9vjNUgkLrPDA5qxn9Dz0VId0P7/Czj4Mxu3hoLgbrVx5OtOWr5Q==}
@@ -60,19 +68,19 @@ packages:
     version: 2.4.1-moe4all.1
 
   dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz:
-    resolution: {integrity: sha512-JwoAUmOKYaJ9XravuYfF7zKvTloeyvt3FklaXbuXeoSogV9mmLo3kBkF2fS8nMZFPAqHeOEcCrcijZXHX+84OA==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz}
-    version: 0.2.0-alpha.20
-    engines: {dsh: '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0', node: '>=20'}
+    resolution: {integrity: sha512-2zZvtDWq2/hthluZqVONz5mwP0jvp/aiOerMJjQYXR7GDjraoHg9ITbE1I+9qVr2GKJq1JSot+wmeJjYDWxxIA==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz}
+    version: 0.2.2
+    engines: {dsh: '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0', node: '>=20.3.0'}
     peerDependencies:
       '@deepseek-ai/cordis': '>=4.0.1 <5'
-      '@deepseek-ai/dsh-client-locale': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-client-runtime': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-client-ui-settings': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-client-ui-slots': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-credentials': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-host-webserver': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-llm-pi-ai': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
-      '@deepseek-ai/dsh-settings': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0'
+      '@deepseek-ai/dsh-client-locale': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-client-runtime': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-client-ui-settings': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-client-ui-slots': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-credentials': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-host-webserver': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-llm-pi-ai': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
+      '@deepseek-ai/dsh-settings': '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0'
       '@deepseek-ai/schemastery': '>=3.18.1 <4'
       react: ^18.2.0
 
@@ -151,6 +159,14 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0-rc
 
+  minipass@7.1.3:
+    resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
+    engines: {node: '>=16 || 14 >=14.17'}
+
+  minizlib@3.1.0:
+    resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
+    engines: {node: '>= 18'}
+
   morphicons@1.7.1:
     resolution: {integrity: sha512-q5ylxy5/d7vBg0OAzanlooXf05PekovMYDuuQVpr6vAQZxl99lrJbaIi+jJ32PXQf9WEEaDO2pbNBsx1ZhEnFQ==}
     peerDependencies:
@@ -179,6 +195,15 @@ packages:
   schemastery@3.18.0:
     resolution: {integrity: sha512-Jw2uxjoyyqc/yeurmChUEc/jbi8GsrdXV/KmqRUDZXJAXAmrJiPsz8vKa17l/VckyzljHZ9oGaul443CQiXxtA==}
 
+  semver@7.8.5:
+    resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
+    engines: {node: '>=10'}
+    hasBin: true
+
+  tar@7.5.22:
+    resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
+    engines: {node: '>=18'}
+
   undici@6.29.0:
     resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
     engines: {node: '>=18.17'}
@@ -187,14 +212,24 @@ packages:
     resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
 
+  yallist@5.0.0:
+    resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
+    engines: {node: '>=18'}
+
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
+  '@isaacs/fs-minipass@4.0.1':
+    dependencies:
+      minipass: 7.1.3
+
   '@standard-schema/spec@1.1.0': {}
 
   argparse@2.0.1: {}
+
+  chownr@3.0.0: {}
 
   cloudflared@0.7.3: {}
 
@@ -207,6 +242,8 @@ snapshots:
   dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all.tgz:
     dependencies:
       lucide-react: 0.468.0
+      semver: 7.8.5
+      tar: 7.5.22
       undici: 6.29.0
 
   dsh-market-moe4all@file:../../../../runtime/plugin-packs/dsh-market-moe4all.tgz:
@@ -245,6 +282,12 @@ snapshots:
 
   lucide-react@0.468.0: {}
 
+  minipass@7.1.3: {}
+
+  minizlib@3.1.0:
+    dependencies:
+      minipass: 7.1.3
+
   morphicons@1.7.1: {}
 
   qrcode.react@4.2.0: {}
@@ -254,8 +297,20 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       cosmokit: 1.8.1
 
+  semver@7.8.5: {}
+
+  tar@7.5.22:
+    dependencies:
+      '@isaacs/fs-minipass': 4.0.1
+      chownr: 3.0.0
+      minipass: 7.1.3
+      minizlib: 3.1.0
+      yallist: 5.0.0
+
   undici@6.29.0: {}
 
   undici@7.30.0: {}
+
+  yallist@5.0.0: {}
 
   zod@4.6.7: {}
