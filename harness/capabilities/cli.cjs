@@ -12,6 +12,17 @@ async function main() {
   process.once('SIGTERM', () => controller.abort());
   const send = value => process.stdout.write('@@MOE4ALL_CAPABILITIES\t' + JSON.stringify(value) + '\n');
   const center = await new CapabilityCenter(values.root, { signal: controller.signal, notify: send }).init();
+  const unsettled = () => {
+    const message = 'Capability operation did not finish. Restart the Agent and retry.';
+    process.stderr.write(message + '\n');
+    process.exitCode = 1;
+    if (['download', 'verify', 'prepare'].includes(center.state.operation?.phase)) {
+      center.state.operation.phase = 'error';
+      center.state.operation.error = message;
+      void center.emit().catch(error => process.stderr.write(errorText(error) + '\n'));
+    }
+  };
+  process.once('beforeExit', unsettled);
   try {
     let result;
     switch (positionals[0]) {
@@ -33,7 +44,7 @@ async function main() {
       default: throw new Error('Unknown capability command');
     }
     send(result);
-  } finally { await center.dispose(); }
+  } finally { process.removeListener('beforeExit', unsettled); await center.dispose(); }
 }
 
 if (require.main === module) main().catch(error => {

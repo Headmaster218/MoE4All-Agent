@@ -90,6 +90,39 @@ test('automatic/manual checks are metadata-only; confirmation and exact versions
   f.calls.length = 0; await f.center.check(true, true); assert.equal(f.calls.length, 0);
 });
 
+test('installed snapshots materialize pnpm hardlinks as regular files and settle promptly', { timeout: 5000 }, async () => {
+  const f = await fixture();
+  const source = path.join(f.directory, 'node_modules', item.id);
+  const original = path.join(source, 'lib/index.js');
+  await fs.link(original, path.join(source, 'lib/same-inode.js'));
+  assert((await fs.stat(original)).nlink > 1);
+  const archive = path.join(f.root, 'hardlinks.tgz');
+  await profile.installedArchive(source, archive, tool);
+  const entries = [];
+  await tool('tar').t({ file: archive, onReadEntry: entry => entries.push([entry.path, entry.type]) });
+  assert(entries.every(([, type]) => type === 'File'));
+  const extracted = path.join(f.root, 'extracted');
+  await fs.mkdir(extracted);
+  await tool('tar').x({ file: archive, cwd: extracted, strip: 1 });
+  assert.equal(await fs.readFile(path.join(extracted, 'lib/same-inode.js'), 'utf8'), await fs.readFile(original, 'utf8'));
+});
+
+test('an unsettled CLI cannot exit successfully while preparation is incomplete', async () => {
+  const f = await fixture();
+  const runtime = path.join(f.root, 'harness/runtime/update-tools');
+  await fs.mkdir(path.dirname(runtime), { recursive: true });
+  await fs.symlink(process.env.MOE4ALL_CAPABILITY_TEST_TOOLS, runtime, 'junction');
+  const script = path.join(f.root, 'unsettled.cjs');
+  await fs.writeFile(script, `const {CapabilityCenter}=require(${JSON.stringify(require.resolve('./center.cjs'))});
+CapabilityCenter.prototype.snapshot=()=>new Promise(()=>{});
+process.argv=[process.execPath,__filename,'status','--root',${JSON.stringify(f.root)}];
+require(${JSON.stringify(require.resolve('./cli.cjs'))}).main().catch(e=>{console.error(e);process.exitCode=2});\n`);
+  const result = await new Promise(resolve => require('node:child_process').execFile(process.execPath, [script], { timeout: 5000 },
+    (error, stdout, stderr) => resolve({ error, stdout, stderr })));
+  assert.equal(result.error?.code, 1);
+  assert.match(result.stderr, /operation did not finish/);
+});
+
 test('new plugin peers are checked against the actual packaged host, not the old plugin manifest', async () => {
   const f = await fixture({ host: null });
   const runtime = path.join(f.root, 'harness/runtime/dsh');

@@ -49,6 +49,13 @@ async function installedArchive(directory, destination, tool) {
   const pkg = await json(path.join(directory, 'package.json'));
   assert(Array.isArray(pkg.files) && pkg.files.length, 'Installed plugin must declare its packaged files');
   const files = new Set(['package.json']);
+  const statCache = new Map();
+  const remember = (file, stat) => {
+    // pnpm hardlinks are a storage detail. Snapshot every file's bytes, not link topology.
+    stat.nlink = 1;
+    statCache.set(path.resolve(file).replaceAll('\\', '/'), stat);
+  };
+  remember(path.join(directory, 'package.json'), lstatSync(path.join(directory, 'package.json')));
   function visit(relative) {
     assert(!relative.split(/[\\/]/u).includes('..') && !path.isAbsolute(relative), 'Unsafe installed plugin file');
     if (relative.split(/[\\/]/u).some(part => part === 'node_modules' || part.startsWith('.'))) return;
@@ -56,14 +63,14 @@ async function installedArchive(directory, destination, tool) {
     const stat = lstatSync(file);
     assert(!stat.isSymbolicLink(), 'Installed plugin payload contains a link');
     if (stat.isDirectory()) for (const child of readdirSync(file)) visit(path.join(relative, child));
-    else { assert(stat.isFile()); files.add(relative); }
+    else { assert(stat.isFile()); files.add(relative); remember(file, stat); }
   }
   for (const pattern of pkg.files) {
     assert(typeof pattern === 'string' && !pattern.startsWith('!') && !pattern.includes('..') && !path.isAbsolute(pattern));
     for (const file of globSync(pattern, { cwd: directory })) visit(file);
   }
   for (const file of readdirSync(directory)) if (/^(?:LICENSE(?:\..*)?|README(?:\..*)?)$/iu.test(file)) visit(file);
-  await tool('tar').c({ cwd: directory, file: destination, prefix: 'package/', gzip: true, portable: true, noMtime: true }, [...files].sort());
+  await tool('tar').c({ cwd: directory, file: destination, prefix: 'package/', gzip: true, portable: true, noMtime: true, statCache }, [...files].sort());
 }
 
 async function runInstaller(node, cli, directory, store, signal, progress) {
