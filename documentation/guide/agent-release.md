@@ -42,5 +42,5 @@ $version = (Get-Content ./harness/distribution/agent-build.json -Raw | ConvertFr
 
 `harness/distribution/agent-release.json` 是生成的构建来源清单，不作为源码提交。
 使用 `-PrebuiltHarnessRoot` 时，构建器校验其中的 DSH、插件提交、profile lock SHA256 与运行时版本，不能直接复用旧版本目录。
-`0.1.0-preview.4.local.2` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。
+`0.1.0-preview.4.local.3` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。
 更新器识别 `preview.N.local.M`，同一 preview 下按 local 编号递增，后续更高 preview 或正式版仍能正常更新。
