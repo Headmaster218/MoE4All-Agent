@@ -1598,6 +1598,8 @@ internal static class MoE4All
             {
                 dialog.Description = Presentation.Translate("Select a MoE4All workspace directory");
                 dialog.ShowNewFolderButton = true;
+                string workspace = Path.Combine(root, "data", "workspace");
+                if (Directory.Exists(workspace)) dialog.SelectedPath = workspace;
                 return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.SelectedPath : null;
             }
         }

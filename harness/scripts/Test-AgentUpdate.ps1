@@ -63,6 +63,7 @@ $preview2 = Write-Archive "$prefix-preview.2"
 $preview3 = Write-Archive "$prefix-preview.3"
 
 $oldGuard = $env:MOE4ALL_AGENT_UPDATE_TEST
+$originalLocation = (Get-Location).Path
 try {
     $env:MOE4ALL_AGENT_UPDATE_TEST = '1'
     $updater = Join-Path $install 'harness\scripts\Check-AgentUpdate.ps1'
@@ -84,6 +85,7 @@ try {
 } finally {
     $env:MOE4ALL_AGENT_UPDATE_TEST = $oldGuard
 }
+if ((Get-Location).Path -ne $originalLocation) { throw 'Updater changed the calling process working directory.' }
 
 $current = Get-Content -LiteralPath (Join-Path $install 'harness\distribution\agent-release.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $previous = Get-Content -LiteralPath (Join-Path $install 'updates\previous\harness\distribution\agent-release.json') -Raw -Encoding UTF8 | ConvertFrom-Json

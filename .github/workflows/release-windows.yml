@@ -62,6 +62,7 @@ jobs:
           $zip = Get-ChildItem artifacts/agent-release -Filter '*.zip' | Select-Object -First 1
           ./harness/scripts/Test-AgentRelease.ps1 -Archive $zip.FullName
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: ${{ !cancelled() }}
         with:
           name: windows-agent-${{ steps.version.outputs.tag }}
           path: |

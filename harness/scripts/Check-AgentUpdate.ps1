@@ -187,6 +187,7 @@ $oldMoved = $false
 $newMoved = $false
 $launched = $null
 $phase = 'download'
+$originalLocation = Get-Location
 try {
     New-Item -ItemType Directory -Path $work, $expanded -Force | Out-Null
     if ($testMode) {
@@ -290,6 +291,7 @@ try {
         Write-UpdateStatus 'error' 0 0 ("Update failed: " + $detail)
     }
 } finally {
+    Set-Location -LiteralPath $originalLocation.Path
     if (Test-Path -LiteralPath $work) {
         Assert-UpdatePath $work | Out-Null
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
