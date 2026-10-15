@@ -85,13 +85,13 @@ class CapabilityCenter {
     const anchor = createRequire(path.join(this.root, 'harness/runtime/dsh/package.json'));
     const app = await json(path.join(this.root, 'harness/runtime/dsh/package.json'));
     const peers = {};
-    for (const item of this.catalog) {
-      const pkg = await json(path.join(this.profile, 'node_modules', item.id, 'package.json'));
-      for (const name of Object.keys(pkg.peerDependencies ?? {})) {
-        if (!name.startsWith('@deepseek-ai/') || peers[name]) continue;
-        try { peers[name] = (await packageInfo(anchor, name)).version; }
-        catch { /* Required peers are checked against each downloaded archive before staging. */ }
-      }
+    // Inventory the actual host, not the old plugin's peers: a new release can add peers.
+    const scope = path.join(this.root, 'harness/runtime/dsh/node_modules/@deepseek-ai');
+    for (const short of await fs.readdir(scope)) {
+      if (!/^[0-9A-Za-z._-]+$/u.test(short)) continue;
+      const name = '@deepseek-ai/' + short;
+      try { peers[name] = (await packageInfo(anchor, name)).version; }
+      catch { /* Missing or broken host packages still fail archive compatibility checks. */ }
     }
     return { dshVersion: app.version, peers };
   }
@@ -116,7 +116,7 @@ class CapabilityCenter {
       const row = this.state.plugins[item.id] ?? {};
       const candidate = row.candidate;
       const operation = this.state.operation?.component === item.id
-        && !['complete', 'rolled-back', 'cancelled'].includes(this.state.operation.phase) ? this.state.operation : null;
+        && this.state.operation.phase !== 'cancelled' ? this.state.operation : null;
       plugins.push({ id: item.id, kind: 'plugin', zh: item.zh, en: item.en, installedVersion,
         latestVersion: candidate?.version ?? '', releaseUrl: candidate?.url ?? 'https://github.com/' + item.repository + '/releases',
         updateAvailable: !reason && !!candidate && this.tool('semver').gt(candidate.version, installedVersion),
@@ -192,7 +192,7 @@ class CapabilityCenter {
         && (result.managed || (!runtime.executable && !result.installed && runtime.mode !== 'connect'));
       this.state.engine = { ...result, runtime, canInstall, checkedAt: refresh ? Date.now() : this.state.engine.checkedAt,
         phase: result.install?.stage ?? 'idle', error: result.install?.error
-          || (result.supported && result.confirmedReleaseTag !== true ? 'Update Engine Manager to enable confirmed-version downloads in Capabilities.' : '') };
+          || '', managerUpdateRequired: result.supported && result.confirmedReleaseTag !== true };
     } catch (error) { this.state.engine = { phase: 'error', error: errorText(error), supported: false }; }
   }
 

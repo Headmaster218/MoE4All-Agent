@@ -90,6 +90,22 @@ test('automatic/manual checks are metadata-only; confirmation and exact versions
   f.calls.length = 0; await f.center.check(true, true); assert.equal(f.calls.length, 0);
 });
 
+test('new plugin peers are checked against the actual packaged host, not the old plugin manifest', async () => {
+  const f = await fixture({ host: null });
+  const runtime = path.join(f.root, 'harness/runtime/dsh');
+  await profile.writeJson(path.join(runtime, 'package.json'), { name: '@deepseek-ai/dsh', version: '0.1.1-rc.2' });
+  const peer = '@deepseek-ai/dsh-client-ui-slots';
+  await profile.writeJson(path.join(runtime, 'node_modules', peer, 'package.json'), { name: peer, version: '0.1.1-rc.2' });
+  await publish(f, '1.1.0', { peerDependencies: { [peer]: '>=0.1.1-rc.2 <0.2.0-0' } });
+  await f.center.check(true);
+  assert.equal((await f.center.prepare(item.id, '1.1.0', true)).operation.phase, 'ready');
+  await f.center.cancel();
+  await fs.rm(path.join(runtime, 'node_modules', peer), { recursive: true });
+  const rejected = await f.center.prepare(item.id, '1.1.0', true);
+  assert.equal(rejected.operation.phase, 'error');
+  assert.match(rejected.operation.error, /Required host package is unavailable/);
+});
+
 test('prepared plugin is cold-switched only, then healthy rollback preserves user data and unrelated plugins', async () => {
   const f = await fixture(); await publish(f); await f.center.check(true);
   const before = await profile.identity(f.directory, catalog);
@@ -104,6 +120,15 @@ test('prepared plugin is cold-switched only, then healthy rollback preserves use
   await f.center.healthy(); await f.center.rollback(true); await f.center.apply();
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
   assert.equal(await fs.readFile(path.join(f.directory, 'cordis.patch.yml'), 'utf8'), 'user-owned: untouched\n');
+});
+
+test('old Engine Manager is an installation prerequisite, not an installation error', async () => {
+  const f = await fixture({ engineFetch: async url => Response.json(url.includes('/status')
+    ? { mode: 'connect', owned: false } : { supported: true, latest: { tag: 'release-1.0.1' } }) });
+  await f.center.checkEngine(false);
+  assert.equal(f.center.state.engine.managerUpdateRequired, true);
+  assert.equal(f.center.state.engine.error, '');
+  assert.equal(f.center.state.engine.canInstall, false);
 });
 
 test('unconfirmed startup and interruption at every rename restore the original profile', async () => {

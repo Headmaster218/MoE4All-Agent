@@ -441,6 +441,18 @@ foreach ($entry in Get-ChildItem -LiteralPath $deployPnpm -Directory) {
 foreach ($materialized in @($materializedTargets.Values)) {
     Register-RuntimePackage ([string]$materialized)
 }
+# Browser platform peers may be statically bundled and absent from pnpm's
+# production graph. Retain their real packages for plugin OTA version checks.
+$pluginCatalog = Get-Content -LiteralPath (Join-Path $root 'harness\capabilities\catalog.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+foreach ($plugin in $pluginCatalog.plugins) {
+    $pluginManifest = Get-Content -LiteralPath (Join-Path $buildHarness "agent-state\home\profiles\web\node_modules\$($plugin.id)\package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($null -eq $pluginManifest.peerDependencies) { continue }
+    foreach ($peer in $pluginManifest.peerDependencies.PSObject.Properties.Name) {
+        if ($peer -match '^@deepseek-ai/[0-9A-Za-z._-]+$' -and $pluginManifest.peerDependenciesMeta.$peer.optional -ne $true) {
+            $runtimeQueue.Enqueue($peer)
+        }
+    }
+}
 while ($runtimeQueue.Count -gt 0) {
     $packageName = $runtimeQueue.Dequeue()
     if ($runtimePackages.ContainsKey($packageName)) { continue }
