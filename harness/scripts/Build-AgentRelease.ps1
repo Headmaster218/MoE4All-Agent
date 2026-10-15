@@ -48,6 +48,18 @@ function Get-RelativePath([string]$base, [string]$path) {
     return [Uri]::UnescapeDataString($baseUri.MakeRelativeUri($pathUri).ToString()).Replace('/', '\')
 }
 
+function Copy-ProfileDependencyPins([string]$sourceProfile, [string]$targetProfile) {
+    $source = Get-Content (Join-Path $sourceProfile 'package.json') -Raw | ConvertFrom-Json
+    $targetPath = Join-Path $targetProfile 'package.json'
+    $target = Get-Content $targetPath -Raw | ConvertFrom-Json
+    foreach ($dependency in $target.dependencies.PSObject.Properties) {
+        $pin = $source.dependencies.PSObject.Properties[$dependency.Name]
+        if ($null -eq $pin) { throw "Missing bundled plugin dependency: $($dependency.Name)" }
+        $dependency.Value = $pin.Value
+    }
+    [IO.File]::WriteAllText($targetPath, (($target | ConvertTo-Json -Depth 12) + "`n"), (New-Object Text.UTF8Encoding($false)))
+}
+
 $status = & git -C $root status --porcelain --untracked-files=all
 if ($LASTEXITCODE -ne 0 -or $status) { throw 'Commit tracked Agent changes before building a release.' }
 $rootCommit = (& git -C $root rev-parse HEAD).Trim()
@@ -180,9 +192,8 @@ if ($BaseArchive) {
         $targetProfile = Join-Path $stageHarness 'agent-state\home\profiles\web'
         & robocopy (Join-Path $profileSource 'node_modules') (Join-Path $targetProfile 'node_modules') /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
         if ($LASTEXITCODE -ge 8) { throw 'Copying refreshed plugin modules failed.' }
-        foreach ($file in @('package.json', 'pnpm-lock.yaml')) {
-            Copy-Item -LiteralPath (Join-Path $profileSource $file) -Destination (Join-Path $targetProfile $file) -Force
-        }
+        Copy-ProfileDependencyPins $profileSource $targetProfile
+        Copy-Item -LiteralPath (Join-Path $profileSource 'pnpm-lock.yaml') -Destination (Join-Path $targetProfile 'pnpm-lock.yaml') -Force
         & $profileNode (Join-Path $PSScriptRoot 'Verify-AgentProfile.cjs') $profileHarness $targetProfile
         if ($LASTEXITCODE -ne 0) { throw 'Copied profile failed plugin runtime verification.' }
         $seed = [IO.Path]::GetFullPath((Join-Path $stageHarness 'distribution\prebuilt-state'))
@@ -300,6 +311,7 @@ if ($PrebuiltHarnessRoot) {
     }
     & robocopy (Join-Path $builtProfile 'node_modules') (Join-Path $stageProfile 'node_modules') /E /XJ /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Copying the prebuilt profile failed (robocopy $LASTEXITCODE)." }
+    Copy-ProfileDependencyPins $builtProfile $stageProfile
     Copy-Item -LiteralPath (Join-Path $builtProfile 'pnpm-lock.yaml') -Destination (Join-Path $stageProfile 'pnpm-lock.yaml') -Force
 
     $builtNode = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Filter node.exe -Recurse -ErrorAction SilentlyContinue |
