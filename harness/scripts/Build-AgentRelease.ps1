@@ -104,8 +104,9 @@ if ($BaseArchive) {
                 throw "Unexpected base archive path: $($entry.FullName)"
             }
         }
-        $baseManifestEntry = $baseReader.GetEntry("$baseTop/harness/distribution/agent-release.json")
-        if ($null -eq $baseManifestEntry) { throw 'The base release manifest is missing.' }
+        $baseManifestEntries = @($baseReader.Entries | Where-Object { $_.FullName.Replace('\', '/') -ceq "$baseTop/harness/distribution/agent-release.json" })
+        if ($baseManifestEntries.Count -ne 1) { throw 'The base release manifest is missing or duplicated.' }
+        $baseManifestEntry = $baseManifestEntries[0]
         $manifestReader = New-Object IO.StreamReader($baseManifestEntry.Open())
         try { $baseManifest = $manifestReader.ReadToEnd() | ConvertFrom-Json } finally { $manifestReader.Dispose() }
         $baseCommit = [string]$baseManifest.sourceCommit
