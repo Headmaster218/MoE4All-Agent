@@ -15,8 +15,8 @@ importers:
         specifier: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-1c01fa9007167e0d.tgz
         version: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-1c01fa9007167e0d.tgz
       dsh-llm-moe4all:
-        specifier: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-e93b0e68320c32d2.tgz
-        version: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-e93b0e68320c32d2.tgz
+        specifier: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-bb0231be5d3ac578.tgz
+        version: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-bb0231be5d3ac578.tgz
       dsh-market-moe4all:
         specifier: file:../../../../runtime/plugin-packs/dsh-market-moe4all-fee27920bba4f1f7.tgz
         version: file:../../../../runtime/plugin-packs/dsh-market-moe4all-fee27920bba4f1f7.tgz
@@ -67,9 +67,9 @@ packages:
     resolution: {integrity: sha512-7xl/+V/VwD+qWGYpUTq5Ev2dISxLJ+7FsPKUir4HBjxUlvs7ZAG3zVEPqvojotFkJZ46xtP5GLoR8Om4XKgvPg==, tarball: file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-1c01fa9007167e0d.tgz}
     version: 2.4.1-moe4all.1
 
-  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-e93b0e68320c32d2.tgz:
-    resolution: {integrity: sha512-3bXAHHiMN9kY6cHe1bGxzf53OX4t+YaL/1meQSPQtjOEPIEOFExOanujmInBvL1Dz8RdmR1LIdVDH4B7kSMbSw==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-e93b0e68320c32d2.tgz}
-    version: 0.2.2
+  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-bb0231be5d3ac578.tgz:
+    resolution: {integrity: sha512-kvKtXltW3EhRFmUDAfWducl3GlV5rRRpORgcDDXsARh+TXtZgCSbTgR3HyvuSYK8lwKZMRnuVxB0nSmGOBXhRA==, tarball: file:../../../../runtime/plugin-packs/dsh-llm-moe4all-bb0231be5d3ac578.tgz}
+    version: 0.2.3
     engines: {dsh: '>=0.1.1-rc.2 <0.1.2 || >=0.1.2-0 <0.1.3 || >=0.1.3-0 <0.1.4 || >=0.1.4-0 <0.1.5 || >=0.1.5-0 <0.1.6 || >=0.1.6-0 <0.1.7 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.2.1-0', node: '>=20.3.0'}
     peerDependencies:
       '@deepseek-ai/cordis': '>=4.0.1 <5'
@@ -239,7 +239,7 @@ snapshots:
 
   dsh-easyrewrite-moe4all@file:../../../../runtime/plugin-packs/dsh-easyrewrite-moe4all-1c01fa9007167e0d.tgz: {}
 
-  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-e93b0e68320c32d2.tgz:
+  dsh-llm-moe4all@file:../../../../runtime/plugin-packs/dsh-llm-moe4all-bb0231be5d3ac578.tgz:
     dependencies:
       lucide-react: 0.468.0
       semver: 7.8.5
