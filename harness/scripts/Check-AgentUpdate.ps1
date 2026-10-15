@@ -247,8 +247,11 @@ try {
     $capabilityCli = Join-Path $root 'harness\capabilities\cli.cjs'
     if (Test-Path -LiteralPath $capabilityCli -PathType Leaf) {
         if (-not $next.dshVersion) { throw 'The new Agent release does not declare its plugin host version. Compatibility cannot be verified.' }
-        $capabilityNode = Get-ChildItem -LiteralPath (Join-Path $root 'harness\runtime') -Directory -Filter 'node-v*-win-x64' |
+        $capabilityNode = @((Join-Path $root 'node.exe'), (Join-Path $root 'harness\bootstrap\node.exe')) |
+            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        if (-not $capabilityNode) { $capabilityNode = Get-ChildItem -LiteralPath (Join-Path $root 'harness\runtime') -Directory -Filter 'node-v*-win-x64' |
             ForEach-Object { Join-Path $_.FullName 'node.exe' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        }
         if (-not $capabilityNode) { throw 'The capability center Node runtime is missing.' }
         & $capabilityNode $capabilityCli compatibility --root $root --version ([string]$next.dshVersion)
         if ($LASTEXITCODE -ne 0) { throw 'Installed plugins are not compatible with the new Agent, or a plugin update is still pending. The current Agent has not been stopped.' }

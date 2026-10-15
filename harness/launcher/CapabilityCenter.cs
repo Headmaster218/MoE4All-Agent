@@ -9,6 +9,25 @@ using System.Windows.Forms;
 
 internal static partial class MoE4All
 {
+    internal static string FindBundledNode(string installRoot)
+    {
+        foreach (string relative in new[] { "node.exe", "harness/bootstrap/node.exe" })
+        {
+            string node = Path.Combine(installRoot, relative);
+            if (File.Exists(node)) return Path.GetFullPath(node);
+        }
+        string runtime = Path.Combine(installRoot, "harness/runtime");
+        if (Directory.Exists(runtime))
+        {
+            foreach (string directory in Directory.GetDirectories(runtime, "node-v*-win-x64"))
+            {
+                string node = Path.Combine(directory, "node.exe");
+                if (File.Exists(node)) return Path.GetFullPath(node);
+            }
+        }
+        throw new FileNotFoundException("The bundled Node runtime is missing.");
+    }
+
     private sealed partial class AgentWindow : Form
     {
         private Dictionary<string, object> capabilityState;
@@ -38,21 +57,11 @@ internal static partial class MoE4All
             }));
         }
 
-        private string CapabilityNode()
-        {
-            foreach (string directory in Directory.GetDirectories(Path.Combine(root, "harness/runtime"), "node-v*-win-x64"))
-            {
-                string node = Path.Combine(directory, "node.exe");
-                if (File.Exists(node)) return node;
-            }
-            throw new FileNotFoundException("The bundled Node runtime is missing.");
-        }
-
         private int RunCapabilities(string arguments, bool stream)
         {
             string cli = Path.Combine(root, "harness/capabilities/cli.cjs");
             if (!File.Exists(cli)) throw new FileNotFoundException("The capability center is missing. Reinstall the complete Agent package.");
-            ProcessStartInfo start = new ProcessStartInfo(CapabilityNode());
+            ProcessStartInfo start = new ProcessStartInfo(FindBundledNode(root));
             start.Arguments = Quote(cli) + " " + arguments + " --root " + Quote(root);
             start.WorkingDirectory = root;
             start.UseShellExecute = false; start.CreateNoWindow = true;

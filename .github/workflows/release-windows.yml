@@ -53,6 +53,8 @@ jobs:
           $node = (Get-ChildItem artifacts/agent-release -Filter node.exe -Recurse | Where-Object { $_.FullName -match 'bootstrap' } | Select-Object -First 1).FullName
           & $node --test harness/scripts/Test-BundledRuntime.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed.' }
+          $launcher = Join-Path (Split-Path (Split-Path $node -Parent) -Parent) '..\MoE4All.exe'
+          ./harness/scripts/Test-AgentNodeResolution.ps1 -Launcher $launcher -OutputDirectory (Join-Path $env:RUNNER_TEMP 'agent-node-resolution')
           ./harness/scripts/Test-AgentUpdateVersion.ps1
           ./harness/scripts/Test-AgentProfilePayload.ps1
           ./harness/scripts/Test-AgentUpdate.ps1

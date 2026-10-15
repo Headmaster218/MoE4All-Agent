@@ -38,6 +38,6 @@ Agent 更新不批量升级或降级已有插件，也不捆绑 Engine 更新。
 
 ## 构建与验证
 
-更新工具依赖固定在 `harness/distribution/update-tools/package-lock.json`，随整包提供，不要求用户先装 Node 或 pnpm。事务、状态和设置位于 `data/capabilities`，依赖缓存位于 `cache/node`，与模型、用户会话分开。
+更新工具依赖固定在 `harness/distribution/update-tools/package-lock.json`，随整包提供，不要求用户先装 Node 或 pnpm。桌面协调器依次使用安装根目录、bootstrap、开发 runtime 布局中的 Node，不能只验证开发目录而遗漏压缩整包布局。事务、状态和设置位于 `data/capabilities`，依赖缓存位于 `cache/node`，与模型、用户会话分开。
 
 核心回归使用 `harness/capabilities/center.test.cjs`，测试根目录与工具目录必须显式指定到隔离 staging/tmp。客户端测试覆盖进程消息、自动弹窗、跳过版本、确认下载、进度、重启确认和订阅释放，浏览器检查中英与四套配色。发布前仍需从最终 ZIP 验证完整 Agent 启动、插件冷切换、移动目录和整包更新兼容性，不能用单测代替正式包验收。
