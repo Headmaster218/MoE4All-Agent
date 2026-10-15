@@ -22,6 +22,16 @@ lock 维护会从插件的 Git commit 打包，明确关闭 Git archive 的 auto
 DSH 部署使用 pnpm shared-lockfile deploy（仅在部署阶段启用 workspace injection），
 从已检查的 workspace lock 生成冻结的部署 lock；不使用会重新解析依赖的 legacy deploy。
 
+## 插件独立发布
+
+“发布所有维护插件”必须逐个覆盖八个插件，不能只处理新增 CI 的仓库或仅确认已有 Release。每个插件都核对本地 main、远端 main、最新发布 tag 的目标 commit、包内版本和公开资产；没有变更且五者一致的插件不重复升版。
+
+存在未发布提交时，先完成源码、runtime 与测试，再升包版本、更新对应 lock 和变更说明，推送 main 与新的 `release-<package.version>` tag。已发布 tag 不移动；Release 的 `target_commitish: main` 不表示 tag 会随 main 更新。提交 main 本身不触发插件发布，tag 发布工作流成功才会生成新资产。
+
+发布后重新下载公开资产，检查远端大小、SHA256、包名、版本、运行入口及兼容范围；提供 release manifest 的插件还需核对其源码 commit。最终清单逐个记录本地 main、远端 main 与发布 tag 一致，而不是以 Agent 整包中包含某次提交代替独立插件已发布。
+
+Agent gitlink 与 profile lock 固定最新验收组合。为测试能力中心，可在隔离体验 profile 中安装真实旧 Release，验证确认下载、重启切换与回退；这不改变源码仓库的最新指针，不伪造插件版本。Agent 本体是否 push、打 tag 和发布，始终是另一项明确决定。
+
 ## 发布流程
 
 1. 先在各子仓 main 收敛功能和修复，完成测试及 runtime 构建。本地验收可以暂不 push；正式发布前必须先 push 子仓 main，并确认其包含 Agent 要引用的提交。
@@ -31,14 +41,18 @@ DSH 部署使用 pnpm shared-lockfile deploy（仅在部署阶段启用 workspac
 5. 验收通过后将草稿公开。预览标签包含 `-preview.N`，发布为 prerelease。
 
 CI 不下载大模型，也不宣称 GPU 推理已验收。最终模型对话属于发布前人工环境验收；
-证据留在 ignored `artifacts`，发行说明记录结论，不打包个人配置和模型路径。
+本机证据按工作区磁盘规则进入统一生成物根目录的 `evidence/agent/<task-id>`，发行说明记录结论，不打包个人配置和模型路径。
 
 ## 本地构建
 
 ```powershell
 $version = (Get-Content ./harness/distribution/agent-build.json -Raw | ConvertFrom-Json).version
-./harness/scripts/Build-AgentRelease.ps1 -Version "release-$version"
-./harness/scripts/Test-AgentRelease.ps1 -Archive "./artifacts/agent-release/MoE4All-Agent-Windows-x64-v$version.zip"
+if (-not $env:MOE4ALL_WORK_ROOT) { throw 'Set the generated-data root according to the workspace disk policy.' }
+$task = Get-Date -Format 'yyyyMMdd-HHmmss-agent-local'
+$output = Join-Path $env:MOE4ALL_WORK_ROOT "staging/agent/$task/package"
+$check = Join-Path $env:MOE4ALL_WORK_ROOT "staging/agent/$task/acceptance"
+./harness/scripts/Build-AgentRelease.ps1 -Version "release-$version" -OutputDirectory $output
+./harness/scripts/Test-AgentRelease.ps1 -Archive (Join-Path $output "MoE4All-Agent-Windows-x64-v$version.zip") -OutputDirectory $check
 ```
 
 源码及子模块必须干净且匹配提交指针。不要把开发 profile、生产 DSH 数据或本机绝对路径复制进发行包。
