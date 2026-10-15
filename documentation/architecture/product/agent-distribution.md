@@ -75,6 +75,10 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 旧 `Build-DevHarness.ps1` 是本地迁移开发工具：会复制设置、凭据、patch 和 workspace registry，刻意不复制 sessions、attachments、projection cache、node_modules 或远端配对状态；workspace 记录仍指向真实目录。不要用它制作公共发行 profile，干净构建使用 Agent 入口。
 
+## 标题模型与思考策略
+
+默认 profile 不为会话标题单独指定 provider 或模型；标题生成跟随当前主请求已记录的准确路由，切换主模型后使用相应模型。用户仍可成对配置标题专用 provider/model。标题调用固定请求关闭思考：MoE4All 经 pi-ai 的 chat-template 兼容设置发送 `chat_template_kwargs.enable_thinking=false`，不修改主对话的思考开关、强度或持久设置。不能关闭思考的模型拒绝该辅助调用，保留已有标题。
+
 ## 发布边界
 
 当前开发中的桌面[能力中心](../../guide/capabilities.md)统一呈现 Agent、八个维护插件与 Engine 的独立更新。检查可自动运行，下载安装及插件重启切换均需确认；Agent 更新不隐式更新全部插件。能力中心属于 Agent 本体，独立插件的市场兼容名与更新通道不变。
