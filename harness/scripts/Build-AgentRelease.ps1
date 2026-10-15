@@ -23,7 +23,8 @@ $name = "MoE4All-Agent-Windows-x64-$assetVersion"
 $stage = Join-Path $output $name
 $archive = Join-Path $output "$name.zip"
 $checksum = "$archive.sha256"
-$deploy = Join-Path $output "$name-dsh-deploy"
+# Dependency lifecycle shells still require a short working directory on Windows.
+$deploy = Join-Path $output 'dsh-deploy'
 if ((Test-Path -LiteralPath $stage) -or (Test-Path -LiteralPath $archive) -or (Test-Path -LiteralPath $deploy)) {
     throw "Release output already exists: $name"
 }
