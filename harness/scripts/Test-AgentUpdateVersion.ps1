@@ -12,7 +12,12 @@ $cases = @(
     @('agent-v0.2.0', 'agent-v0.1.0', $true),
     @('agent-v0.1.0', 'agent-v0.2.0', $false),
     @('agent-v0.2.0-preview.1', 'agent-v0.1.0', $false),
-    @('invalid', 'agent-v0.1.0', $false)
+    @('invalid', 'agent-v0.1.0', $false),
+    @('release-0.1.0-preview.5', 'release-0.1.0-preview.4.local.1', $true),
+    @('release-0.1.0', 'release-0.1.0-preview.4.local.1', $true),
+    @('release-0.1.0-preview.4.local.2', 'release-0.1.0-preview.4.local.1', $true),
+    @('release-0.1.0-preview.4', 'release-0.1.0-preview.4.local.1', $false),
+    @('release-0.1.0-preview.4.local.1', 'release-0.1.0', $false)
 )
 foreach ($case in $cases) {
     $actual = Test-AgentVersionNewer $case[0] $case[1]
