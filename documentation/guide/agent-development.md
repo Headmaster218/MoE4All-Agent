@@ -24,3 +24,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Run-Agen
 `harness/1-Build-or-Initialize.cmd` 与 `2-Start.cmd` 是早期 DevHarness 两入口，等价于 Build/Run-DevHarness，并非干净公共发行入口。`-RefreshConfig` 会主动刷新生产设置到隔离开发环境，普通增量构建不会覆盖既有配置。
 
 内置插件源码由 gitlink 固定，不能从市场最新版临时拼装后仍宣称同一发布基线。成品验收需确认 loader 依赖到位、并发双应用隔离、默认模型提供商、手机审批、定时任务及升级确认流程。更多边界见[当前产品架构](../architecture/product/agent-distribution.md)。
+
+## 插件维护
+
+八个自有插件统一在各自的 `main` 开发和提交；`.gitmodules` 的跟踪分支也固定为 `main`。先提交插件源码及对应的 `lib` 运行文件，再更新 Agent 的 gitlink 与 profile 依赖锁，最后提交 Agent `main`。普通构建使用已提交的固定 commit，不自动拉取远端分支，也不把版本号相同当作运行文件相同。
+
+仅修改插件 Host 时，本地测试安装可单独更新该插件，不需要重新编译 DSH、桌面壳或引擎。更新前确认测试 Agent 已退出，备份原插件，校验新包与插件 commit 一致，再替换安装目录中的对应插件，并记录本地覆盖的 commit 和包校验值。不得替换用户配置、会话、记忆、模型或 KV；原始发行 ZIP 保持不变。此维护流程不等于已启用发行版内置插件的独立在线更新，后者仍遵循 Agent 统一更新策略。
