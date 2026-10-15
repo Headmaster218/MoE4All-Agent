@@ -16,6 +16,9 @@ internal static partial class MoE4All
         Rectangle clamped = ClampDesktopBounds(new Rectangle(-5000, 5000, 4000, 2000), work);
         if (!work.Contains(clamped) || clamped.Width != 1896 || clamped.Height != 1056)
             throw new InvalidOperationException("Saved bounds must stay within the current working area.");
+        Rectangle compact = new Rectangle(24, 24, 976, 672);
+        if (ClampDesktopBounds(compact, new Rectangle(0, 0, 1024, 720)) != compact)
+            throw new InvalidOperationException("A compact screen must restore its saved dimensions exactly.");
         string fixture = Path.Combine(root, "window-state-fixture");
         using (AgentWindow first = new AgentWindow(fixture, false)) first.ValidateDesktopWindowForTest(false);
         using (AgentWindow next = new AgentWindow(fixture, false)) next.ValidateDesktopWindowForTest(true);
@@ -25,8 +28,10 @@ internal static partial class MoE4All
 
     internal static Rectangle ClampDesktopBounds(Rectangle saved, Rectangle work)
     {
-        int width = Math.Min(Math.Max(980, saved.Width), Math.Max(320, work.Width - 24));
-        int height = Math.Min(Math.Max(680, saved.Height), Math.Max(300, work.Height - 24));
+        int minimumWidth = Math.Min(980, Math.Max(320, work.Width - 48));
+        int minimumHeight = Math.Min(680, Math.Max(300, work.Height - 48));
+        int width = Math.Min(Math.Max(minimumWidth, saved.Width), Math.Max(320, work.Width - 24));
+        int height = Math.Min(Math.Max(minimumHeight, saved.Height), Math.Max(300, work.Height - 24));
         int left = Math.Max(work.Left, Math.Min(saved.Left, work.Right - width));
         int top = Math.Max(work.Top, Math.Min(saved.Top, work.Bottom - height));
         return new Rectangle(left, top, width, height);
@@ -77,6 +82,7 @@ internal static partial class MoE4All
                 Rectangle saved = new Rectangle(Convert.ToInt32(data["x"]), Convert.ToInt32(data["y"]), Convert.ToInt32(data["width"]), Convert.ToInt32(data["height"]));
                 Rectangle work = Screen.FromRectangle(saved).WorkingArea;
                 StartPosition = FormStartPosition.Manual;
+                MinimumSize = new Size(Math.Min(980, Math.Max(320, work.Width - 48)), Math.Min(680, Math.Max(300, work.Height - 48)));
                 Bounds = ClampDesktopBounds(saved, work);
                 if (data.ContainsKey("maximized") && data["maximized"] is bool && (bool)data["maximized"]) WindowState = FormWindowState.Maximized;
             } catch (Exception error) { WriteMessage("Window position: " + error.Message); }
