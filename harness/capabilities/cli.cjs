@@ -16,7 +16,7 @@ async function main() {
     const message = 'Capability operation did not finish. Restart the Agent and retry.';
     process.stderr.write(message + '\n');
     process.exitCode = 1;
-    if (['download', 'verify', 'prepare'].includes(center.state.operation?.phase)) {
+    if (['download', 'verify', 'prepare', 'snapshot', 'dependencies', 'validate'].includes(center.state.operation?.phase)) {
       center.state.operation.phase = 'error';
       center.state.operation.error = message;
       void center.emit().catch(error => process.stderr.write(errorText(error) + '\n'));
@@ -32,6 +32,7 @@ async function main() {
       case 'check': result = await center.check(values.force, values.automatic); break;
       case 'engine-status': result = await center.lock(async () => { await center.checkEngine(false); return center.emit(); }); break;
       case 'engine-install': result = await center.engineInstall(values.confirm, values.version); break;
+      case 'engine-bootstrap': result = await center.bootstrapEngine(); break;
       case 'engine-cancel': result = await center.engineCancel(); break;
       case 'prepare': result = await center.prepare(values.id, values.version, values.confirm); break;
       case 'apply': result = await center.apply(); break;

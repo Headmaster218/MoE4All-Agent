@@ -14,7 +14,7 @@ function errorText(error) {
     .replace(/([?&](?:token|key|password)=)[^&\s]+/giu, '$1<redacted>').slice(-1500);
 }
 
-async function treeHash(root) {
+async function treeHash(root, progress = () => {}) {
   const { createHash } = require('node:crypto');
   const digest = createHash('sha256');
   let count = 0, bytes = 0;
@@ -27,6 +27,7 @@ async function treeHash(root) {
       else if (stat.isDirectory()) { digest.update('dir\0'); await visit(file, name); }
       else { assert(stat.isFile()); digest.update(await fs.readFile(file)); }
       digest.update('\0');
+      progress('validate', count, 0);
     }
   }
   await visit(root);
@@ -70,11 +71,20 @@ class CapabilityCenter {
     this.settingsPath = path.join(this.storage, 'settings.json');
     this.journalPath = path.join(this.storage, 'transaction.json');
     this.settings = existsSync(this.settingsPath) ? await json(this.settingsPath)
-      : { autoCheck: true, preview: /-/u.test(build.version ?? ''), skipped: {} };
+      : { autoCheck: true, preview: false, skipped: {}, schema: 2 };
+    const resetChannel = this.settings.schema !== 2;
+    if (resetChannel) {
+      // Old previews inferred this setting from the Agent version, not a channel choice.
+      this.settings.preview = false; this.settings.schema = 2;
+      await writeJson(this.settingsPath, this.settings);
+    }
     this.settings.skipped ??= {};
     assert(this.settings.skipped && typeof this.settings.skipped === 'object' && !Array.isArray(this.settings.skipped), 'Invalid skipped versions');
     assert(typeof this.settings.autoCheck === 'boolean' && typeof this.settings.preview === 'boolean', 'Invalid capability settings');
     this.state = existsSync(this.statePath) ? await json(this.statePath) : { plugins: {}, operation: null, engine: null };
+    if (resetChannel) for (const row of Object.values(this.state.plugins)) {
+      row.checkedAt = 0; row.candidate = null; row.phase = 'idle'; row.error = '';
+    }
     this.transport = this.options.fetch ? null : require('./transport.cjs').createTransport(this.tool);
     this.fetcher = this.options.fetch ?? this.transport.fetch;
     return this;
@@ -116,14 +126,14 @@ class CapabilityCenter {
       const row = this.state.plugins[item.id] ?? {};
       const candidate = row.candidate;
       const operation = this.state.operation?.component === item.id
-        && this.state.operation.phase !== 'cancelled' ? this.state.operation : null;
+        && !['cancelled', 'complete', 'rolled-back'].includes(this.state.operation.phase) ? this.state.operation : null;
       plugins.push({ id: item.id, kind: 'plugin', zh: item.zh, en: item.en, installedVersion,
         latestVersion: candidate?.version ?? '', releaseUrl: candidate?.url ?? 'https://github.com/' + item.repository + '/releases',
         updateAvailable: !reason && !!candidate && this.tool('semver').gt(candidate.version, installedVersion),
         phase: operation?.phase ?? row.phase ?? 'idle', error: reason || operation?.error || row.error || '',
         completed: operation?.completed ?? 0, total: operation?.total ?? 0,
         pending: operation?.phase === 'ready', rollbackAvailable: !!this.state.rollback && this.state.rollback.component === item.id,
-        checkedAt: row.checkedAt ?? 0 });
+        checkedAt: row.checkedAt ?? 0, lastUpdate: row.lastUpdate ?? null });
     }
     return { schema: 'moe4all/capabilities/v1', settings: this.settings, plugins, engine: this.state.engine, checking: !!this.checking,
       operation: this.state.operation, pending: !!this.state.operation && ['ready', 'applying', 'awaiting-health'].includes(this.state.operation.phase) };
@@ -141,7 +151,7 @@ class CapabilityCenter {
       catch (probe) { if (probe.code !== 'ESRCH') throw probe; }
       await fs.unlink(file);
       handle = await fs.open(file, 'wx', 0o600);
-      if (this.state.operation && ['download', 'verify', 'prepare'].includes(this.state.operation.phase)) {
+      if (this.state.operation && ['download', 'verify', 'prepare', 'snapshot', 'dependencies', 'validate'].includes(this.state.operation.phase)) {
         this.state.operation.phase = 'cancelled';
         this.state.operation.error = 'The previous preparation was interrupted; installed plugins were not changed.';
       }
@@ -164,7 +174,7 @@ class CapabilityCenter {
           const pkg = await json(path.join(this.profile, 'node_modules', item.id, 'package.json'));
           const bytes = await release.receive(this.fetcher, 'https://api.github.com/repos/' + item.repository + '/releases?per_page=30', 2 * 1024 * 1024, this.signal);
           const candidate = release.selectRelease(JSON.parse(bytes), item, pkg.version, this.settings.preview, this.tool('semver'));
-          this.state.plugins[item.id] = { candidate, checkedAt: Date.now(), phase: candidate?.update ? 'available' : 'current', error: '' };
+          this.state.plugins[item.id] = { ...old, candidate, checkedAt: Date.now(), phase: candidate?.update ? 'available' : 'current', error: '' };
         } catch (error) { this.state.plugins[item.id] = { ...old, phase: 'error', error: errorText(error) }; }
         await this.emit();
       }
@@ -210,6 +220,17 @@ class CapabilityCenter {
     });
   }
 
+  async bootstrapEngine() {
+    if (this.state.engineBootstrapAttempted) return this.snapshot();
+    await this.checkEngine(false);
+    const engine = this.state.engine, runtime = engine.runtime;
+    if (!engine.canInstall || !engine.latest || engine.installed || engine.versions?.length
+      || !runtime || runtime.mode === 'connect' || runtime.executable || runtime.ready || runtime.owned) return this.emit();
+    this.state.engineBootstrapAttempted = true;
+    await this.emit();
+    return this.engineInstall(true, engine.latest.tag);
+  }
+
   async engineCancel() {
     return this.lock(async () => {
       await this.engineRequest('/api/moe4all/install-cancel', 'POST');
@@ -250,7 +271,7 @@ class CapabilityCenter {
           item, archive, version: candidate.version, tool: this.tool, signal: this.signal, progress, install: this.options.install });
         const transaction = { schema: 1, id: operationId, component: id, version: candidate.version, directory,
           staged: staged.staged, backup: path.join(directory, 'previous'), base: staged.base, phase: 'ready',
-          after: await identity(staged.staged, this.catalog), treeHash: await treeHash(path.join(staged.staged, 'node_modules')) };
+          after: await identity(staged.staged, this.catalog), treeHash: await treeHash(path.join(staged.staged, 'node_modules'), progress) };
         await writeJson(this.journalPath, transaction);
         this.state.operation.phase = 'ready'; this.state.operation.completed = candidate.bytes;
       } catch (error) {
@@ -282,7 +303,7 @@ class CapabilityCenter {
   }
 
   async compatibility(dshVersion) {
-    assert(!this.state.operation || !['download', 'verify', 'prepare', 'ready', 'applying', 'awaiting-health'].includes(this.state.operation.phase),
+    assert(!this.state.operation || !['download', 'verify', 'prepare', 'snapshot', 'dependencies', 'validate', 'ready', 'applying', 'awaiting-health'].includes(this.state.operation.phase),
       'Finish or cancel the pending plugin update before updating the Agent');
     assert(this.tool('semver').valid(dshVersion), 'The Agent release must declare its DSH version');
     const host = await this.host();
@@ -326,7 +347,7 @@ class CapabilityCenter {
       if (['applying', 'awaiting-health', 'rollback-requested'].includes(transaction.phase)) {
         if (transaction.phase === 'rollback-requested') assert.deepEqual(await identity(this.profile, this.catalog), transaction.after, 'Profile changed since update; refusing to overwrite user changes');
         await profileTools.restore(this.profile, transaction, this.journalPath);
-        this.state.operation = { component: transaction.component, version: transaction.version, phase: 'rolled-back', error: 'The previous plugin was restored.' };
+        this.state.operation = { component: transaction.component, version: transaction.version, phase: 'rolled-back', error: '' };
         this.state.rollback = null;
         return this.emit();
       }
@@ -363,7 +384,8 @@ class CapabilityCenter {
         await writeJson(path.join(transaction.directory, 'applied.json'), transaction);
         this.state.rollback = { component: transaction.component, id: transaction.id };
         this.state.operation.phase = 'complete';
-        this.state.plugins[transaction.component] = { ...this.state.plugins[transaction.component], phase: 'current', error: '' };
+        this.state.plugins[transaction.component] = { ...this.state.plugins[transaction.component], phase: 'current', error: '',
+          lastUpdate: { from: transaction.base.versions[transaction.component], to: transaction.version, at: Date.now() } };
       }
       await this.prune();
       return this.emit();

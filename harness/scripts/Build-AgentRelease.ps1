@@ -149,12 +149,12 @@ if ($BaseArchive) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination (Join-Path $stageHarness "scripts\$scriptName") -Force
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Prepare-BundledRuntime.cjs') -Destination (Join-Path $stageHarness 'scripts\Prepare-BundledRuntime.cjs') -Force
-    foreach ($scriptName in @('Restart-Agent.ps1')) {
+    foreach ($scriptName in @('Restart-Agent.ps1', 'Extract-AgentUpdate.cjs')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination (Join-Path $stageHarness "scripts\$scriptName") -Force
     }
     Copy-Item -LiteralPath (Join-Path $root 'harness\capabilities') -Destination $stageHarness -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor') -Destination (Join-Path $stageHarness 'scripts\vendor') -Recurse -Force
-    foreach ($launcherSource in @('MoE4All.cs', 'CapabilityCenter.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
+    foreach ($launcherSource in @('MoE4All.cs', 'CapabilityCenter.cs', 'DesktopPicker.cs', 'DesktopWindow.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
         Copy-Item -LiteralPath (Join-Path $root "harness\launcher\$launcherSource") -Destination (Join-Path $stageHarness "launcher\$launcherSource") -Force
     }
     $stageLauncherVendor = Join-Path $stageHarness 'launcher\vendor'
@@ -242,6 +242,7 @@ $agentPaths = @(
     'harness/scripts/Build-DevHarness.ps1',
     'harness/scripts/Verify-AgentProfile.cjs',
     'harness/scripts/Check-AgentUpdate.ps1',
+    'harness/scripts/Extract-AgentUpdate.cjs',
     'harness/scripts/Initialize-Agent.ps1',
     'harness/scripts/Prepare-BundledRuntime.ps1',
     'harness/scripts/Prepare-BundledRuntime.cjs',

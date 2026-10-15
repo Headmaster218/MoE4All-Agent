@@ -17,7 +17,7 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { return }
 $installed = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($installed.product -ne 'moe4all-agent') { return }
 . (Join-Path $PSScriptRoot 'AgentUpdateVersion.ps1')
-$includePrerelease = ([string]$installed.version).Contains('-preview.')
+$includePrerelease = $false
 $capabilitySettingsPath = Join-Path $root 'data\capabilities\settings.json'
 if (Test-Path -LiteralPath $capabilitySettingsPath -PathType Leaf) {
     $capabilitySettings = Get-Content -LiteralPath $capabilitySettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -224,9 +224,11 @@ try {
     Write-UpdateStatus 'extract' 0 0 'Preparing the new application'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $reader = [IO.Compression.ZipFile]::OpenRead($download)
+    $fileCount = 0
     try {
         $expectedTop = [IO.Path]::GetFileNameWithoutExtension($zipAsset.name)
         foreach ($entry in $reader.Entries) {
+            if (-not $entry.FullName.EndsWith('/') -and -not $entry.FullName.EndsWith('\')) { $fileCount++ }
             $parts = $entry.FullName -split '[\\/]'
             if ($parts.Count -lt 2 -or $parts[0] -ne $expectedTop -or
                 $parts -contains '..' -or $entry.FullName.Contains(':')) {
@@ -234,7 +236,13 @@ try {
             }
         }
     } finally { $reader.Dispose() }
-    Expand-Archive -LiteralPath $download -DestinationPath $expanded
+    $extractor = Join-Path $PSScriptRoot 'Extract-AgentUpdate.cjs'
+    $updateNode = @((Join-Path $root 'node.exe'), (Join-Path $root 'harness\bootstrap\node.exe')) |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($testMode -and $env:MOE4ALL_AGENT_UPDATE_TEST_NODE) { $updateNode = $env:MOE4ALL_AGENT_UPDATE_TEST_NODE }
+    if (-not $updateNode -or -not (Test-Path -LiteralPath $extractor -PathType Leaf)) { throw 'The bundled update extractor is missing.' }
+    & $updateNode $extractor --root $root --archive $download --destination $expanded --sha256 $actualHash.ToLowerInvariant() --files ([string]$fileCount)
+    if ($LASTEXITCODE -ne 0) { throw 'Agent update extraction failed. The current application has not been stopped.' }
     $nextManifest = Join-Path $newRoot 'harness\distribution\agent-release.json'
     foreach ($required in @('MoE4All.exe', 'MoE4All.exe.config', 'harness', 'harness\bootstrap\node.exe', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll', 'WebView2Loader.dll')) {
         if (-not (Test-Path -LiteralPath (Join-Path $newRoot $required))) { throw "The Agent archive is missing $required." }

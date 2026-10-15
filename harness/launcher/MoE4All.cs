@@ -364,6 +364,7 @@ internal static partial class MoE4All
         bool startupUiTest = Array.IndexOf(arguments, "--startup-ui-test") >= 0;
         string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
         if (startupUiTest) return RunStartupUiTest(root);
+        if (Array.IndexOf(arguments, "--window-state-test") >= 0) return RunDesktopWindowTest(root);
         try
         {
             RepairLauncherConfiguration(root);
@@ -897,9 +898,9 @@ internal static partial class MoE4All
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Dpi;
             Rectangle workingArea = Screen.FromPoint(Cursor.Position).WorkingArea;
-            int initialWidth = Math.Max(680, Math.Min(1180, workingArea.Width - 48));
-            int initialHeight = Math.Max(500, Math.Min(760, workingArea.Height - 48));
-            MinimumSize = new Size(Math.Min(760, initialWidth), Math.Min(520, initialHeight));
+            int initialWidth = Math.Max(680, Math.Min(1380, workingArea.Width - 48));
+            int initialHeight = Math.Max(500, Math.Min(920, workingArea.Height - 48));
+            MinimumSize = new Size(Math.Min(980, initialWidth), Math.Min(680, initialHeight));
             Size = new Size(initialWidth, initialHeight);
             BackColor = Presentation.ColorFor("base");
             ForeColor = Presentation.ColorFor("text");
@@ -1103,7 +1104,9 @@ internal static partial class MoE4All
             Controls.Add(startup);
             Controls.Add(toolbar);
             RefreshAppearance();
-            Load += delegate { FitToWorkingArea(); ApplyWindowTheme(Handle); };
+            Load += delegate { FitToWorkingArea(); RestoreDesktopWindow(); desktopWindowLoaded = true; ApplyWindowTheme(Handle); };
+            ResizeEnd += delegate { SaveDesktopWindow(); };
+            SizeChanged += delegate { TrackDesktopWindowState(); };
             SystemEvents.UserPreferenceChanged += OnSystemAppearanceChanged;
             if (startAgentOnShown) Shown += async delegate { await InitializeBrowser(); if (!closing) StartAgent(); };
             FormClosing += OnClosing;
@@ -1190,6 +1193,7 @@ internal static partial class MoE4All
         private void PublishDesktopState(bool open)
         {
             RefreshCapabilities();
+            PublishPicker();
             if (closing || IsDisposed || !ready || !desktopBridgeReady || webView.CoreWebView2 == null) return;
             if (open && desktopPhase == "available") desktopNotified = true;
             string json = new JavaScriptSerializer().Serialize(new {
@@ -1217,6 +1221,7 @@ internal static partial class MoE4All
                 Uri source;
                 if (!ready || !Uri.TryCreate(message.Source, UriKind.Absolute, out source) || source.Scheme != "http" || source.Host != "127.0.0.1" || source.Port != WebPort) return;
                 if (type as string == "moe4all-capabilities-command") { ReceiveCapabilityCommand(value); return; }
+                if (type as string == "moe4all-picker-command") { ReceivePickerCommand(value); return; }
                 if (type as string == "moe4all-desktop-command")
                 {
                     if (!value.TryGetValue("command", out command)) return;
@@ -1904,6 +1909,8 @@ internal static partial class MoE4All
 
         private void OnClosing(object sender, FormClosingEventArgs e)
         {
+            SaveDesktopWindow();
+            FinishPicker(null);
             closing = true;
             CloseCapabilities();
             SystemEvents.UserPreferenceChanged -= OnSystemAppearanceChanged;
@@ -1916,73 +1923,18 @@ internal static partial class MoE4All
 
         public string PickDirectory()
         {
-            if (InvokeRequired) return (string)Invoke(new Func<string>(PickDirectory));
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog())
-            {
-                dialog.Description = Presentation.Translate("Select a MoE4All workspace directory");
-                dialog.ShowNewFolderButton = true;
-                string workspace = Path.Combine(root, "data", "workspace");
-                if (Directory.Exists(workspace)) dialog.SelectedPath = workspace;
-                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.SelectedPath : null;
-            }
+            return PickPath("directory", Path.Combine(root, "data", "workspace"));
         }
 
         public string PickModel(string initialDirectory)
         {
-            if (InvokeRequired) return (string)Invoke(new Func<string, string>(PickModel), initialDirectory);
-            using (OpenFileDialog dialog = new OpenFileDialog())
-            {
-                dialog.Title = Presentation.Translate("Select a MoE4All GGUF model");
-                dialog.Filter = Presentation.Translate("GGUF model (*.gguf)|*.gguf|All files (*.*)|*.*");
-                dialog.Multiselect = false;
-                dialog.CheckFileExists = true;
-                dialog.InitialDirectory = Directory.Exists(initialDirectory) ? initialDirectory : root;
-                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.FileName : null;
-            }
+            return PickPath("model", Directory.Exists(initialDirectory) ? initialDirectory : root);
         }
 
         public string PickEngine()
         {
-            if (InvokeRequired) return (string)Invoke(new Func<string>(PickEngine));
-            using (OpenFileDialog dialog = new OpenFileDialog())
-            {
-                dialog.Title = Presentation.Translate("Select a MoE4All engine package or infr.exe");
-                dialog.Filter = "MoE4All engine (*.zip;infr.exe)|*.zip;infr.exe|ZIP archive (*.zip)|*.zip|Engine executable (infr.exe)|infr.exe|All files (*.*)|*.*";
-                dialog.Multiselect = false;
-                dialog.CheckFileExists = true;
-                string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-                dialog.InitialDirectory = Directory.Exists(downloads) ? downloads : root;
-                return ShowThemedPicker(dialog) == DialogResult.OK ? dialog.FileName : null;
-            }
-        }
-
-        private delegate bool WindowVisitor(IntPtr handle, IntPtr parameter);
-        [DllImport("user32.dll")]
-        private static extern bool EnumThreadWindows(uint thread, WindowVisitor visitor, IntPtr parameter);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern int GetClassName(IntPtr handle, StringBuilder name, int capacity);
-        [DllImport("kernel32.dll")]
-        private static extern uint GetCurrentThreadId();
-
-        private DialogResult ShowThemedPicker(CommonDialog dialog)
-        {
-            uint thread = GetCurrentThreadId();
-            using (System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer())
-            {
-                timer.Interval = 80;
-                timer.Tick += delegate
-                {
-                    EnumThreadWindows(thread, delegate(IntPtr handle, IntPtr parameter)
-                    {
-                        StringBuilder name = new StringBuilder(64);
-                        GetClassName(handle, name, name.Capacity);
-                        if (name.ToString() == "#32770") ApplyWindowTheme(handle);
-                        return true;
-                    }, IntPtr.Zero);
-                };
-                timer.Start();
-                return dialog.ShowDialog(this);
-            }
+            string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            return PickPath("engine", Directory.Exists(downloads) ? downloads : root);
         }
     }
 

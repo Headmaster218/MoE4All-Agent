@@ -74,13 +74,14 @@ async function installedArchive(directory, destination, tool) {
 }
 
 async function runInstaller(node, cli, directory, store, signal, progress) {
+  progress('dependencies', 0, 0);
   await new Promise((resolve, reject) => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(key)));
     const child = spawn(node, [cli, 'install', '--ignore-scripts', '--no-frozen-lockfile', '--prefer-offline', '--store-dir', store,
       '--fetch-retries=1', '--fetch-timeout=30000'], { cwd: directory, env: { ...env, CI: 'true' }, windowsHide: true, shell: false,
       signal, stdio: ['ignore', 'pipe', 'pipe'] });
     let tail = '';
-    const feed = chunk => { tail = (tail + chunk.toString()).slice(-3000); progress('prepare', 0, 0); };
+    const feed = chunk => { tail = (tail + chunk.toString()).slice(-3000); progress('dependencies', 0, 0); };
     child.stdout.on('data', feed); child.stderr.on('data', feed);
     child.once('error', reject);
     child.once('close', code => code === 0 ? resolve() : reject(new Error('Plugin dependency installation failed: ' + tail)));
@@ -97,6 +98,8 @@ async function stageProfile(options) {
   const workspace = yaml.load(await fs.readFile(path.join(profile, 'pnpm-workspace.yaml'), 'utf8'));
   assert(workspace.nodeLinker === 'hoisted' && workspace.autoInstallPeers === false, 'Unsupported Agent package layout');
   const before = structuredClone(manifest);
+  let snapshots = 0;
+  progress('snapshot', 0, catalog.length);
   for (const entry of catalog) {
     signal.throwIfAborted();
     const installed = path.join(profile, 'node_modules', entry.id);
@@ -104,6 +107,7 @@ async function stageProfile(options) {
     contained(await fs.realpath(path.join(profile, 'node_modules')), actual);
     const baseline = path.join(directory, entry.id + '-before.tgz');
     await installedArchive(actual, baseline, tool);
+    progress('snapshot', ++snapshots, catalog.length);
     manifest.dependencies[entry.id] = 'file:' + (entry.id === item.id ? archive : baseline).replaceAll('\\', '/');
   }
   for (const [name, spec] of Object.entries(manifest.dependencies)) {

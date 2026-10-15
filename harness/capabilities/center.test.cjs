@@ -150,7 +150,14 @@ test('prepared plugin is cold-switched only, then healthy rollback preserves use
   assert.equal((await profile.identity(f.directory, catalog)).versions[other.id], '1.0.0');
   const manifest = await profile.json(path.join(f.directory, 'package.json'));
   assert(!manifest.dependencies[item.id].includes(f.root.replaceAll('\\', '/')), 'Persisted archive pins must be portable');
-  await f.center.healthy(); await f.center.rollback(true); await f.center.apply();
+  await f.center.healthy();
+  const applied = (await f.center.snapshot()).plugins[0];
+  assert.equal(applied.installedVersion, '1.1.0');
+  assert.notEqual(applied.phase, 'complete');
+  assert.deepEqual({ ...applied.lastUpdate, at: 0 }, { from: '1.0.0', to: '1.1.0', at: 0 });
+  await f.center.check(true);
+  assert.deepEqual((await f.center.snapshot()).plugins[0].lastUpdate, applied.lastUpdate);
+  await f.center.rollback(true); await f.center.apply();
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
   assert.equal(await fs.readFile(path.join(f.directory, 'cordis.patch.yml'), 'utf8'), 'user-owned: untouched\n');
 });
@@ -237,6 +244,32 @@ test('Engine checks never install; confirmed fresh installs work, external and r
     if (mode === 'fresh') { await assert.rejects(f.center.engineInstall(true, 'release-0.9.0'), /version changed/); await f.center.engineInstall(true, 'release-1.0.0'); assert(calls.some(row => row[0].endsWith('/install') && row[1] === 'POST')); }
     else { await assert.rejects(f.center.engineInstall(true)); assert(calls.every(row => row[1] === 'GET')); }
   }
+});
+
+test('fresh prompt mode bootstraps once without starting inference; connect, configured and reachable engines are untouched', async () => {
+  for (const mode of ['fresh', 'connect', 'configured', 'reachable']) {
+    const calls = [];
+    const f = await fixture({ engineFetch: async (url, init) => {
+      calls.push([url, init.method]);
+      return Response.json(url.includes('/status') ? { mode: mode === 'connect' ? 'connect' : 'prompt', owned: false,
+        ready: mode === 'reachable', executable: mode === 'configured' ? 'infr.exe' : '' }
+        : { supported: true, confirmedReleaseTag: true, managed: false, latest: { tag: 'release-1.0.1' }, versions: [] });
+    } });
+    await f.center.bootstrapEngine(); await f.center.bootstrapEngine();
+    assert.equal(calls.filter(([url, method]) => method === 'POST' && url.endsWith('/install')).length, mode === 'fresh' ? 1 : 0);
+    assert(!calls.some(([url]) => /\/start|model-download/u.test(url)));
+  }
+});
+
+test('preview is opt-in, including migration from implicitly enabled old settings', async () => {
+  const f = await fixture();
+  assert.equal(f.center.settings.preview, false);
+  await profile.writeJson(f.center.settingsPath, { autoCheck: true, preview: true, skipped: {} });
+  await f.center.init();
+  assert.equal(f.center.settings.preview, false);
+  await f.center.setSettings({ autoCheck: true, preview: true });
+  await f.center.init();
+  assert.equal(f.center.settings.preview, true);
 });
 
 test('real pinned pnpm installer prepares offline runtime archives without lifecycle execution', async () => {

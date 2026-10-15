@@ -218,11 +218,12 @@ async function unpack(harness, archive, progress) {
   };
 
   const unzip = new Unzip((file) => {
-    const target = contained(destination, file.name);
+    const entryName = file.name.replaceAll('\\', '/');
+    const target = contained(destination, entryName);
     const key = target.toLowerCase();
     if (names.has(key)) throw new Error(`Duplicate runtime payload path: ${file.name}`);
     names.add(key);
-    if (file.name.endsWith('/')) {
+    if (entryName.endsWith('/')) {
       mkdir(target);
       file.ondata = (error) => { if (error) fail(error); };
       file.start();

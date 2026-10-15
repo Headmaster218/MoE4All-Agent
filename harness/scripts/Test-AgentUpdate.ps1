@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$OutputDirectory, [switch]$LegacyTags)
+param([string]$OutputDirectory, [switch]$LegacyTags, [string]$NodeExecutable)
 
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -39,6 +39,10 @@ function Write-App([string]$Root, [string]$Version) {
     New-Item -ItemType Directory -Path (Join-Path $Root 'harness\scripts') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'AgentUpdateVersion.ps1') -Destination (Join-Path $Root 'harness\scripts\AgentUpdateVersion.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Check-AgentUpdate.ps1') -Destination (Join-Path $Root 'harness\scripts\Check-AgentUpdate.ps1') -Force
+    foreach ($script in @('Extract-AgentUpdate.cjs', 'Prepare-BundledRuntime.cjs')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $Root "harness\scripts\$script") -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor') -Destination (Join-Path $Root 'harness\scripts') -Recurse -Force
 }
 
 function Write-Archive([string]$Version) {
@@ -63,6 +67,13 @@ $preview2 = Write-Archive "$prefix-preview.2"
 $preview3 = Write-Archive "$prefix-preview.3"
 
 $oldGuard = $env:MOE4ALL_AGENT_UPDATE_TEST
+$oldNode = $env:MOE4ALL_AGENT_UPDATE_TEST_NODE
+if (-not $NodeExecutable) {
+    $NodeExecutable = Get-ChildItem (Join-Path $repo 'harness\runtime') -Directory -Filter 'node-v*-win-x64' |
+        ForEach-Object { Join-Path $_.FullName 'node.exe' } | Select-Object -First 1
+}
+if (-not $NodeExecutable -or -not (Test-Path -LiteralPath $NodeExecutable -PathType Leaf)) { throw 'Pass the existing bundled Node executable for the extraction test.' }
+$env:MOE4ALL_AGENT_UPDATE_TEST_NODE = [IO.Path]::GetFullPath($NodeExecutable)
 $originalLocation = (Get-Location).Path
 try {
     $env:MOE4ALL_AGENT_UPDATE_TEST = '1'
@@ -84,6 +95,7 @@ try {
     & (Join-Path $install 'harness\scripts\Check-AgentUpdate.ps1') -InstallRoot $install -ParentPid $PID -TestArchive $preview3 -TestRoot $testRoot -TestInstallOnly
 } finally {
     $env:MOE4ALL_AGENT_UPDATE_TEST = $oldGuard
+    $env:MOE4ALL_AGENT_UPDATE_TEST_NODE = $oldNode
 }
 if ((Get-Location).Path -ne $originalLocation) { throw 'Updater changed the calling process working directory.' }
 

@@ -130,7 +130,7 @@ internal static partial class MoE4All
                 catch (Exception error)
                 {
                     WriteMessage(error.ToString(), true);
-                    if (!closing) BeginInvoke(new Action(delegate { CapabilityError(error.Message); }));
+                    if (!automatic && !closing) BeginInvoke(new Action(delegate { CapabilityError(error.Message); }));
                 }
                 if (closing) return;
                 BeginInvoke(new Action(delegate
@@ -142,6 +142,10 @@ internal static partial class MoE4All
                     else if (command == "healthy" && result == 0 && !capabilityStarted)
                     {
                         capabilityStarted = true;
+                        BeginCapabilityAction("engine-bootstrap", true);
+                    }
+                    else if (command == "engine-bootstrap")
+                    {
                         if (CapabilityFlag(CapabilityObject(capabilityState, "settings"), "autoCheck"))
                         {
                             StartUpdateAction("Check", false);
@@ -158,7 +162,7 @@ internal static partial class MoE4All
             capabilityPoll.Tick += delegate
             {
                 string phase = CapabilityField(CapabilityObject(capabilityState, "engine"), "phase");
-                if (!closing && ready && !capabilityBusy && !updateInstalling && Array.IndexOf(new[] { "downloading", "extracting", "verifying", "finalizing" }, phase) >= 0)
+                if (!closing && ready && !capabilityBusy && !updateInstalling && Array.IndexOf(new[] { "checking", "downloading", "extracting", "verifying", "finalizing" }, phase) >= 0)
                     BeginCapabilityAction("engine-status", true);
                 else if (!closing && ready && capabilityHealthConfirmed && !capabilityBusy && !updateBusy && DateTime.UtcNow >= nextCapabilityCheck
                     && CapabilityFlag(CapabilityObject(capabilityState, "settings"), "autoCheck"))
