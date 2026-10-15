@@ -21,7 +21,7 @@ using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-internal static class MoE4All
+internal static partial class MoE4All
 {
     private const int KillOnJobClose = 0x2000;
     private const int ExtendedLimitInformation = 9;
@@ -842,7 +842,7 @@ internal static class MoE4All
         }
     }
 
-    private sealed class AgentWindow : Form
+    private sealed partial class AgentWindow : Form
     {
         private readonly string root;
         private readonly bool firstLaunch;
@@ -881,6 +881,7 @@ internal static class MoE4All
         private bool preparingProgress;
         private bool updateBusy;
         private bool updateInstalling;
+        private string updateExpectedVersion;
         private bool updateStatusFailed;
         private bool revealUpdateResult;
         private string availableUpdate;
@@ -1184,9 +1185,11 @@ internal static class MoE4All
             browserButton.AccessibleName = Presentation.Translate("Open in browser");
             ApplyWindowTheme(IsHandleCreated ? Handle : IntPtr.Zero);
             PushStartupState();
+            RefreshCapabilities();
         }
         private void PublishDesktopState(bool open)
         {
+            RefreshCapabilities();
             if (closing || IsDisposed || !ready || !desktopBridgeReady || webView.CoreWebView2 == null) return;
             if (open && desktopPhase == "available") desktopNotified = true;
             string json = new JavaScriptSerializer().Serialize(new {
@@ -1213,16 +1216,23 @@ internal static class MoE4All
                 }
                 Uri source;
                 if (!ready || !Uri.TryCreate(message.Source, UriKind.Absolute, out source) || source.Scheme != "http" || source.Host != "127.0.0.1" || source.Port != WebPort) return;
+                if (type as string == "moe4all-capabilities-command") { ReceiveCapabilityCommand(value); return; }
                 if (type as string == "moe4all-desktop-command")
                 {
                     if (!value.TryGetValue("command", out command)) return;
                     if (command as string == "status")
                     {
                         desktopBridgeReady = true;
+                        ConfirmCapabilityHealth();
                         PublishDesktopState(desktopPhase == "available" && !desktopNotified);
                     }
                     if (command as string == "check") StartUpdateAction("Check", true);
-                    if (command as string == "install" && !string.IsNullOrEmpty(availableUpdate)) StartUpdateAction("Install", true);
+                    if (command as string == "install" && !string.IsNullOrEmpty(availableUpdate))
+                    {
+                        object expected;
+                        if (value.TryGetValue("version", out expected) && expected as string == availableUpdate) StartUpdateAction("Install", true);
+                        else { desktopMessage = Presentation.Language == "zh" ? "可用版本已变化，请重新确认。" : "The available version changed. Confirm it again."; PublishDesktopState(true); }
+                    }
                     if (command as string == "browser") OpenUrl("http://127.0.0.1:" + WebPort + "/");
                     if (command as string == "release" && !string.IsNullOrEmpty(availableUpdate))
                         OpenUrl("https://github.com/Headmaster218/MoE4All-Agent/releases/tag/" + Uri.EscapeDataString(availableUpdate));
@@ -1479,6 +1489,7 @@ internal static class MoE4All
         private void StartUpdateAction(string action, bool revealResult)
         {
             if (closing || updateBusy || !ready) return;
+            if (action == "Install" && !ConfirmAgentInstall()) { PublishDesktopState(false); return; }
             string manifest = Path.Combine(root, "harness", "distribution", "agent-release.json");
             string script = Path.Combine(root, "harness", "scripts", "Check-AgentUpdate.ps1");
             if (!File.Exists(manifest) || !File.Exists(script))
@@ -1490,6 +1501,7 @@ internal static class MoE4All
             }
             updateBusy = true;
             updateInstalling = action == "Install";
+            updateExpectedVersion = updateInstalling ? availableUpdate : "";
             updateStatusFailed = false;
             revealUpdateResult = revealResult;
             desktopPhase = updateInstalling ? "download" : "checking";
@@ -1515,6 +1527,7 @@ internal static class MoE4All
                     + " -InstallRoot " + Quote(root)
                     + " -ParentPid " + Process.GetCurrentProcess().Id
                     + " -Action " + action;
+                if (action == "Install") start.Arguments += " -ExpectedVersion " + Quote(updateExpectedVersion);
                 start.RedirectStandardOutput = true;
                 start.RedirectStandardError = true;
                 start.StandardOutputEncoding = new UTF8Encoding(false);
@@ -1695,6 +1708,10 @@ internal static class MoE4All
                 }
 
                 CompletePreparation();
+                if (RunCapabilities("apply", false) != 0) throw new InvalidOperationException("Plugin update recovery failed. See the startup log; installed plugins have not been started.");
+                // A cold switch may restore a profile from before relocation or an Agent upgrade.
+                if (RunScript(job, root, prepareScript, " -InstallRoot " + Quote(root) + " -StateRoot " + Quote(state)) != 0)
+                    throw new InvalidOperationException("Repairing plugin host links after the cold switch failed.");
                 WriteMessage("MoE4All Agent is starting.");
                 Thread readiness = new Thread(WaitForReady);
                 readiness.IsBackground = true;
@@ -1744,7 +1761,7 @@ internal static class MoE4All
             status.ForeColor = Presentation.ColorFor("success");
             status.Visible = false;
             ActivateWebView();
-            if (File.Exists(Path.Combine(root, "harness", "distribution", "agent-release.json"))) StartUpdateAction("Check", false);
+            StartCapabilityChecks();
         }
 
         private Task InitializeBrowser()
@@ -1888,6 +1905,7 @@ internal static class MoE4All
         private void OnClosing(object sender, FormClosingEventArgs e)
         {
             closing = true;
+            CloseCapabilities();
             SystemEvents.UserPreferenceChanged -= OnSystemAppearanceChanged;
             toolbarTip.Dispose();
             if (bridge != null) bridge.Dispose();

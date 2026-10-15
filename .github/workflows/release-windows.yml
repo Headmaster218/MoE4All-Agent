@@ -67,6 +67,12 @@ jobs:
           $node = Join-Path $runs[-1].install 'node.exe'
           & $node --test harness/scripts/Test-AgentProfile.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Plugin archive provenance regression tests failed.' }
+          $env:MOE4ALL_CAPABILITY_TEST_ROOT = Join-Path $env:RUNNER_TEMP 'moe4all-capability-tests'
+          New-Item -ItemType Directory -Path $env:MOE4ALL_CAPABILITY_TEST_ROOT -Force | Out-Null
+          $env:MOE4ALL_CAPABILITY_TEST_TOOLS = Join-Path $runs[-1].install 'harness\runtime\update-tools'
+          $env:MOE4ALL_CAPABILITY_REAL_PROFILE = $env:MOE4ALL_TEST_PROFILE
+          & $node --test harness/capabilities/center.test.cjs harness/capabilities/profile.integration.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Capability update, cold switch and rollback regression tests failed.' }
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ${{ !cancelled() }}
         with:

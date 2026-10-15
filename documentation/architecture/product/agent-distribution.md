@@ -2,7 +2,7 @@
 kind: architecture
 status: current
 scope: agent-product
-last_verified: 2026-10-15
+last_verified: 2026-10-16
 verified_commit: 1d13586
 baseline_tag: release-0.1.0-preview.3
 ---
@@ -44,13 +44,15 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 `1d13586` 在上述发布基线上更新了 DSH 至 `f34e950`、MoE4All provider 至 `d2dd2ce`，其他插件 gitlink 未变。这些提交尚未发布：
 
 - 首次启动保留原生进度页，Agent 页面导航成功后才切换到 WebView；新安装默认使用绿色，已有配色设置继续保留。
-- Agent 内置模式首次自动下载并选中最新引擎；DSH 市场安装的独立插件默认提示用户选择安装，不自动下载引擎。自动下载失败后提供手动重试或导入入口。
+- 该批本地修订曾让 Agent 内置模式首次自动下载并选中最新引擎；后续能力中心将其收敛为用户确认后下载。DSH 市场独立安装不受 Agent 专属环境标识影响。
 - 引擎启动失败的分类与建议支持当前界面的中英文设置；生成默认值增加思考模式及思考强度控件。
 - Bash/PowerShell 的本地执行器与 persistent terminal 默认输出预算为 4000 UTF-8 bytes；截断标记等结果元数据另计，旧 `maxOutputChars` 参数仍作为兼容入口。
 
 随后本地修订移除了插件的日志自动分类与一槽重试入口。当前启动失败界面保留原始错误和日志，统一提供降低并发、降低上下文、切换稳健自动或激进自动策略、选择更小模型四类常见调整建议；调整由用户在设置中完成。后端结构化错误、启动管理通道、临时降级与恢复策略仍处于讨论阶段。
 
 ## 本地 main 收敛
+
+以下为 2026-10-15 早期收敛批次的历史记录；后续 CI 与能力中心提交已继续更新子模块。当前构建组合以根仓 gitlink 和 profile lock 为准，不再把下文的历史提交当作当前指针。
 
 2026-10-15 的本地验收标识为 `0.1.0-preview.4.local.4`，不代表已发布版本。Agent 本体、DSH 与全部维护插件均已收敛到各自本地 main；历史功能分支保留用于追溯，不再作为构建时的隐式版本来源。
 
@@ -74,6 +76,8 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 旧 `Build-DevHarness.ps1` 是本地迁移开发工具：会复制设置、凭据、patch 和 workspace registry，刻意不复制 sessions、attachments、projection cache、node_modules 或远端配对状态；workspace 记录仍指向真实目录。不要用它制作公共发行 profile，干净构建使用 Agent 入口。
 
 ## 发布边界
+
+当前开发中的桌面[能力中心](../../guide/capabilities.md)统一呈现 Agent、八个维护插件与 Engine 的独立更新。检查可自动运行，下载安装及插件重启切换均需确认；Agent 更新不隐式更新全部插件。能力中心属于 Agent 本体，独立插件的市场兼容名与更新通道不变。
 
 `release-0.1.0-preview.3` 已包含桌面 EXE、首次启动引导、运行时准备、更新检查与 Windows CI 回归。CI 验证 bootstrap、移动后重启与插件装载，不下载大模型；导入本地 Engine、加载模型并完成真实对话仍属于发布前人工验收。默认 profile 中模型特化配置仍需公开发行审查；“无凭据快照”不等于所有模型或机器都适用。
 

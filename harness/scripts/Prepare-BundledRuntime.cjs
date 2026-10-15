@@ -373,6 +373,9 @@ function prepareProfile(install, previousInstall, harness, state, dsh) {
       changed = true;
     }
     if (entry.id === 'moe4all-engine' && entry.config) {
+      if (exists(path.join(harness, 'capabilities', 'cli.cjs')) && entry.config.bundledDistribution === true && entry.config.bootstrapEngineOnStart === true) {
+        entry.config.bootstrapEngineOnStart = false; changed = true;
+      }
       const directory = remapManagedPath(entry.config.modelDirectory, mappings);
       if (directory !== entry.config.modelDirectory) { entry.config.modelDirectory = directory; changed = true; }
       if (Array.isArray(entry.config.modelDirectories)) {

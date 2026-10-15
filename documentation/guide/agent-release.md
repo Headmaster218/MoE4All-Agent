@@ -7,6 +7,7 @@ Agent 与 Engine 分别版本化。Agent Windows 包包含桌面壳、Node、DSH
 
 - `harness/distribution/runtime-versions.json` 固定 Node、pnpm、registry 和 Node ZIP SHA256。
 - `harness/distribution/build-tools/package-lock.json` 固定 pnpm 安装包及 integrity。
+- `harness/distribution/update-tools/package-lock.json` 固定随包提供的能力中心工具；用户更新插件不需要另外安装工具链。
 - DSH 使用子模块内的 `pnpm-lock.yaml`；Provider 的源码开发使用子模块内的 `package-lock.json`。
 - 内置插件固定为 Git submodule commit；profile 使用 `harness/distribution/profile/pnpm-lock.yaml`。
 - Actions 使用完整 commit SHA，Windows runner 使用 `windows-2025`。托管 runner 镜像本身会更新，不是位级固定。
@@ -43,6 +44,7 @@ $version = (Get-Content ./harness/distribution/agent-build.json -Raw | ConvertFr
 源码及子模块必须干净且匹配提交指针。不要把开发 profile、生产 DSH 数据或本机绝对路径复制进发行包。
 
 `harness/distribution/agent-release.json` 是生成的构建来源清单，不作为源码提交。
+清单中的 `dshVersion` 用于能力中心在整包安装前核对维护插件宿主范围，缺失时拒绝安装；独立插件更新与整包更新的边界见[能力中心](capabilities.md)。
 使用 `-PrebuiltHarnessRoot` 时，构建器校验其中的 DSH、插件提交、profile lock SHA256 与运行时版本，不能直接复用旧版本目录。
 `0.1.0-preview.4.local.4` 是 main 收敛后的本地验收标识，尚未创建发布标签或上传资产。
 更新器识别 `preview.N.local.M`，同一 preview 下按 local 编号递增，后续更高 preview 或正式版仍能正常更新。

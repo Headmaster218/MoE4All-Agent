@@ -94,6 +94,7 @@ $managedEnvironment = [ordered]@{
     DSH_HOME = $agentHome
     DSH_AGENTS_HOME = (Join-Path $state 'agents')
     MOE4ALL_AGENT = '1'
+    MOE4ALL_CAPABILITY_CENTER = '1'
     MOE4ALL_ROOT = $installRoot
     MOE4ALL_DATA_DIR = $state
     MOE4ALL_MODELS_DIR = $modelsRoot

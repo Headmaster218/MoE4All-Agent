@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if (-not $OutputPath) { $OutputPath = Join-Path $root 'MoE4All.exe' }
 $source = Join-Path $root 'harness\launcher\MoE4All.cs'
+$capabilitiesSource = Join-Path $root 'harness\launcher\CapabilityCenter.cs'
 $startupPage = Join-Path $root 'harness\launcher\Startup.html'
 $manifest = Join-Path $root 'harness\launcher\MoE4All.exe.manifest'
 $config = Join-Path $root 'harness\launcher\MoE4All.exe.config'
@@ -27,7 +28,7 @@ $nativeArgs = @(
     '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
     ("/reference:$core"), ("/reference:$forms"),
     ('/resource:' + $startupPage + ',MoE4All.Startup.html'),
-    ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source
+    ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source, $capabilitiesSource
 )
 & $compiler @nativeArgs
 if ($LASTEXITCODE -ne 0) { throw "Launcher compilation failed with exit code $LASTEXITCODE" }

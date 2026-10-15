@@ -24,6 +24,9 @@ try {
         $env:DSH_CLIENT_COMMIT_HASH = [string]$releaseInfo.dshCommit
     }
     & (Join-Path $PSScriptRoot 'Build-DevHarness.ps1') -SkipInitialize -ProfileDir (Join-Path $state 'home\profiles\web') -Release:$Release -UpdateProfileLock:$UpdateProfileLock
+    $node = Get-ChildItem -LiteralPath (Join-Path $harnessRoot 'runtime') -Filter 'node.exe' -Recurse | Where-Object { $_.Directory.Name -like 'node-v*-win-x64' } | Select-Object -First 1
+    if (-not $node) { throw 'The bundled Node runtime is missing.' }
+    & (Join-Path $PSScriptRoot 'Prepare-CapabilityTools.ps1') -HarnessRoot $harnessRoot -NodeExecutable $node.FullName
 } finally {
     if ($null -eq $oldProfile) { Remove-Item Env:DSH_CLIENT_BUILD_PROFILE -ErrorAction SilentlyContinue } else { $env:DSH_CLIENT_BUILD_PROFILE = $oldProfile }
     if ($null -eq $oldTitle) { Remove-Item Env:DSH_CLIENT_TITLE -ErrorAction SilentlyContinue } else { $env:DSH_CLIENT_TITLE = $oldTitle }

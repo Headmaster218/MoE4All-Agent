@@ -7,6 +7,10 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Build-Agent.ps1') -Destination 
 $utf8 = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText((Join-Path $fixture 'distribution\agent-release.json'), ('{"dshCommit":"' + ('a' * 40) + '"}'), $utf8)
 [IO.File]::WriteAllText((Join-Path $scripts 'Initialize-Agent.ps1'), 'param($StateRoot, $EngineEndpoint)', $utf8)
+[IO.File]::WriteAllText((Join-Path $scripts 'Prepare-CapabilityTools.ps1'), 'param($HarnessRoot, $NodeExecutable)', $utf8)
+$fakeNode = Join-Path $fixture 'runtime\node-v24.9.0-win-x64\node.exe'
+New-Item -ItemType Directory -Path (Split-Path -Parent $fakeNode) -Force | Out-Null
+[IO.File]::WriteAllText($fakeNode, 'test fixture', $utf8)
 [IO.File]::WriteAllText((Join-Path $scripts 'Build-DevHarness.ps1'), @'
 param([switch]$SkipInitialize, $ProfileDir, [switch]$Release, [switch]$UpdateProfileLock)
 [pscustomobject]@{ release = $Release.IsPresent; update = $UpdateProfileLock.IsPresent; commit = $env:DSH_CLIENT_COMMIT_HASH }

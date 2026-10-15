@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "plugins": [
+    { "id": "dsh-llm-moe4all", "zh": "引擎管理", "en": "Engine Manager", "repository": "Headmaster218/dsh-llm-moe4all", "legacyManifest": true },
+    { "id": "dsh-mneme-moe4all", "zh": "Mneme 记忆", "en": "Mneme Memory", "repository": "Headmaster218/dsh-mneme-moe4all" },
+    { "id": "dsh-market-moe4all", "zh": "插件市场", "en": "Plugin Market", "repository": "Headmaster218/dsh-market-moe4all" },
+    { "id": "dsh-remote-web-ui-moe4all", "zh": "手机连接", "en": "Phone Connection", "repository": "Headmaster218/dsh-remote-web-ui-moe4all" },
+    { "id": "dsh-plugin-cron-moe4all", "zh": "定时任务", "en": "Scheduled Tasks", "repository": "Headmaster218/dsh-plugin-cron-moe4all" },
+    { "id": "dsh-plugin-tts-moe4all", "zh": "语音", "en": "Speech", "repository": "Headmaster218/dsh-plugin-tts-moe4all" },
+    { "id": "dsh-easyrewrite-moe4all", "zh": "消息重编辑", "en": "Message Editing", "repository": "Headmaster218/dsh-easyrewrite-moe4all" },
+    { "id": "dsh-web-search-brave-moe4all", "zh": "Brave 搜索", "en": "Brave Search", "repository": "Headmaster218/dsh-web-search-brave-moe4all" }
+  ]
+}

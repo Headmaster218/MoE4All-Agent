@@ -99,7 +99,7 @@ $patch = @'
   config:
     mode: prompt
     bundledDistribution: true
-    bootstrapEngineOnStart: true
+    bootstrapEngineOnStart: false
     endpoint: __ENGINE_ENDPOINT__
     allowRemoteEndpoint: false
 '@

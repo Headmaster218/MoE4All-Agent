@@ -24,3 +24,4 @@ foreach ($case in $cases) {
     if ($actual -ne $case[2]) { throw "Version ordering failed: $($case[0]) vs $($case[1])" }
 }
 Write-Host "Agent version comparisons passed: $($cases.Count)"
+if (-not (Test-AgentVersionNewer 'release-0.2.0-preview.1' 'release-0.1.0' -IncludePrerelease)) { throw 'Explicit preview opt-in was ignored.' }

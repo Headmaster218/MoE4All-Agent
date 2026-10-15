@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
     [Parameter(Mandatory = $true)][int]$ParentPid,
     [ValidateSet('Legacy', 'Check', 'Install')][string]$Action = 'Legacy',
+    [string]$ExpectedVersion,
     [string]$FeedUri = 'https://api.github.com/repos/Headmaster218/MoE4All-Agent/releases?per_page=30',
     [string]$TestArchive,
     [string]$TestRoot,
@@ -16,6 +17,13 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { return }
 $installed = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($installed.product -ne 'moe4all-agent') { return }
 . (Join-Path $PSScriptRoot 'AgentUpdateVersion.ps1')
+$includePrerelease = ([string]$installed.version).Contains('-preview.')
+$capabilitySettingsPath = Join-Path $root 'data\capabilities\settings.json'
+if (Test-Path -LiteralPath $capabilitySettingsPath -PathType Leaf) {
+    $capabilitySettings = Get-Content -LiteralPath $capabilitySettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($capabilitySettings.preview -isnot [bool]) { throw 'Invalid capability update channel setting.' }
+    $includePrerelease = [bool]$capabilitySettings.preview
+}
 
 function Write-UpdateStatus([string]$Kind, [long]$Completed, [long]$Total, [string]$Message) {
     $safeMessage = ([string]$Message).Replace("`r", ' ').Replace("`n", ' ').Replace("`t", ' ')
@@ -139,8 +147,9 @@ if ($testMode) {
     }
     foreach ($release in @($releases)) {
         $tag = [string]$release.tag_name
-        if ($release.draft -eq $true -or -not (Test-AgentVersionNewer $tag ([string]$installed.version))) { continue }
-        if ($null -ne $best -and -not (Test-AgentVersionNewer $tag ([string]$best.tag_name))) { continue }
+        if ($release.draft -eq $true -or (-not $includePrerelease -and ($release.prerelease -eq $true -or $tag.Contains('-preview.'))) -or
+            -not (Test-AgentVersionNewer $tag ([string]$installed.version) -IncludePrerelease:$includePrerelease)) { continue }
+        if ($null -ne $best -and -not (Test-AgentVersionNewer $tag ([string]$best.tag_name) -IncludePrerelease:$includePrerelease)) { continue }
         $assetVersion = if ($tag.StartsWith('release-')) { 'v' + $tag.Substring(8) } else { $tag }
         $zipName = "MoE4All-Agent-Windows-x64-$assetVersion.zip"
         $zip = @($release.assets | Where-Object name -eq $zipName | Select-Object -First 1)[0]
@@ -167,6 +176,10 @@ if ($Action -eq 'Check') {
     $availableBytes = if ($zipAsset.size) { [long]$zipAsset.size } elseif ($testMode) { (Get-Item -LiteralPath $testZip).Length } else { 0 }
     Write-UpdateStatus 'available' 0 $availableBytes ([string]$best.tag_name)
     return
+}
+if ($Action -eq 'Install' -and $ExpectedVersion -and $ExpectedVersion -ne [string]$best.tag_name) {
+    Write-UpdateStatus 'error' 0 0 'The available Agent version changed. Check again before confirming the download.'
+    exit 1
 }
 
 if (-not $testMode -and $Action -eq 'Legacy') {
@@ -230,6 +243,16 @@ try {
     $next = Get-Content -LiteralPath $nextManifest -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($next.product -ne 'moe4all-agent' -or $next.version -ne $best.tag_name -or
         [string]$next.sourceCommit -notmatch '^[0-9a-f]{40}$') { throw 'Agent archive manifest does not match the release.' }
+
+    $capabilityCli = Join-Path $root 'harness\capabilities\cli.cjs'
+    if (Test-Path -LiteralPath $capabilityCli -PathType Leaf) {
+        if (-not $next.dshVersion) { throw 'The new Agent release does not declare its plugin host version. Compatibility cannot be verified.' }
+        $capabilityNode = Get-ChildItem -LiteralPath (Join-Path $root 'harness\runtime') -Directory -Filter 'node-v*-win-x64' |
+            ForEach-Object { Join-Path $_.FullName 'node.exe' } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        if (-not $capabilityNode) { throw 'The capability center Node runtime is missing.' }
+        & $capabilityNode $capabilityCli compatibility --root $root --version ([string]$next.dshVersion)
+        if ($LASTEXITCODE -ne 0) { throw 'Installed plugins are not compatible with the new Agent, or a plugin update is still pending. The current Agent has not been stopped.' }
+    }
 
     if (-not $TestInstallOnly) {
         $phase = 'stop old Agent'

@@ -121,8 +121,8 @@ if ($BaseArchive) {
     & git -C $root cat-file -e ($baseCommit + '^{commit}')
     if ($LASTEXITCODE -ne 0) { throw 'The base source commit is not available for verification.' }
     $runtimePaths = if ($RefreshProfileFromHarness) {
-        @('harness/dsh', 'harness/distribution/runtime-versions.json', 'harness/scripts/Build-Agent.ps1')
-    } else { @($submodules) + @('harness/distribution/profile') }
+        @('harness/dsh', 'harness/distribution/runtime-versions.json', 'harness/scripts/Build-Agent.ps1', 'harness/distribution/update-tools')
+    } else { @($submodules) + @('harness/distribution/profile', 'harness/distribution/update-tools') }
     & git -C $root diff --quiet $baseCommit HEAD -- @runtimePaths
     if ($LASTEXITCODE -ne 0) { throw 'Runtime submodules or profile changed; perform a full release build.' }
 
@@ -147,8 +147,12 @@ if ($BaseArchive) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination (Join-Path $stageHarness "scripts\$scriptName") -Force
     }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Prepare-BundledRuntime.cjs') -Destination (Join-Path $stageHarness 'scripts\Prepare-BundledRuntime.cjs') -Force
+    foreach ($scriptName in @('Restart-Agent.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Destination (Join-Path $stageHarness "scripts\$scriptName") -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $root 'harness\capabilities') -Destination $stageHarness -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor') -Destination (Join-Path $stageHarness 'scripts\vendor') -Recurse -Force
-    foreach ($launcherSource in @('MoE4All.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
+    foreach ($launcherSource in @('MoE4All.cs', 'CapabilityCenter.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
         Copy-Item -LiteralPath (Join-Path $root "harness\launcher\$launcherSource") -Destination (Join-Path $stageHarness "launcher\$launcherSource") -Force
     }
     $stageLauncherVendor = Join-Path $stageHarness 'launcher\vendor'
@@ -226,6 +230,8 @@ $agentPaths = @(
     'LICENSE-MIT',
     'harness/distribution/profile',
     'harness/distribution/build-tools',
+    'harness/distribution/update-tools',
+    'harness/capabilities',
     'harness/distribution/runtime-versions.json',
     'harness/distribution/agent-build.json',
     'harness/launcher',
@@ -238,7 +244,9 @@ $agentPaths = @(
     'harness/scripts/Prepare-BundledRuntime.ps1',
     'harness/scripts/Prepare-BundledRuntime.cjs',
     'harness/scripts/vendor',
-    'harness/scripts/Run-Agent.ps1'
+    'harness/scripts/Run-Agent.ps1',
+    'harness/scripts/Restart-Agent.ps1',
+    'harness/scripts/Prepare-CapabilityTools.ps1'
 )
 & git -c core.autocrlf=false -C $root archive '--format=zip' ("--output=$temp") HEAD @agentPaths
 if ($LASTEXITCODE -ne 0) { throw 'Archiving Agent scripts failed.' }
@@ -265,6 +273,7 @@ $manifest = [ordered]@{
     version = $Version
     sourceCommit = $rootCommit
     dshCommit = $dshCommit
+    dshVersion = (Get-Content (Join-Path $root 'harness\dsh\apps\cli\package.json') -Raw | ConvertFrom-Json).version
     engineVersion = $engineTag
     runtimeVersions = (Get-Content -LiteralPath (Join-Path $root 'harness\distribution\runtime-versions.json') -Raw | ConvertFrom-Json)
     profileLockSha256 = (Get-FileHash -LiteralPath (Join-Path $stageHarness 'distribution\profile\pnpm-lock.yaml') -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -331,6 +340,7 @@ $node = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Filter n
 $pnpmCli = Join-Path $buildHarness 'runtime\pnpm\node_modules\pnpm\bin\pnpm.cjs'
 $pnpmStore = Join-Path $buildHarness 'runtime\pnpm-store'
 if (-not $node -or -not (Test-Path -LiteralPath $pnpmCli -PathType Leaf)) { throw 'The release build runtime is incomplete.' }
+& (Join-Path $PSScriptRoot 'Prepare-CapabilityTools.ps1') -HarnessRoot $stageHarness -NodeExecutable $node
 & $node (Join-Path $PSScriptRoot 'Prepare-AgentDeploy.cjs') (Join-Path $buildHarness 'dsh')
 if ($LASTEXITCODE -ne 0) { throw 'Preparing the approved workspace helper build failed.' }
 Push-Location (Join-Path $buildHarness 'dsh')
