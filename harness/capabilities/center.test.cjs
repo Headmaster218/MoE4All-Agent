@@ -188,6 +188,18 @@ test('an incomplete latest Engine release remains a visible check failure, not a
   assert(!f.center.state.engineBootstrapAttempted);
 });
 
+test('an idle installed Engine has a checked version state and keeps its fresh feed cache across manager restarts', async () => {
+  const f = await fixture({ engineFetch: async url => Response.json(url.includes('/status') ? { mode: 'prompt', owned: false }
+    : { supported: true, confirmedReleaseTag: true, managed: true, installed: { tag: 'release-1.0.2' }, install: { stage: 'idle' },
+      ...(url.includes('force=1') ? { latest: { tag: 'release-1.0.2' } } : {}) }) });
+  await f.center.checkEngine(true);
+  assert.equal(f.center.state.engine.phase, 'current');
+  await f.center.checkEngine(false);
+  assert.equal(f.center.state.engine.latest.tag, 'release-1.0.2');
+  assert.equal(f.center.state.engine.phase, 'current');
+  assert.equal(f.center.state.engine.updateAvailable, false);
+});
+
 test('unconfirmed startup and interruption at every rename restore the original profile', async () => {
   for (const phase of ['backed-up', 'activated']) for (const part of ['node_modules', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     const f = await fixture({ fault: async (point, name) => { if (point === phase && name === part) throw new Error('simulated crash'); } });

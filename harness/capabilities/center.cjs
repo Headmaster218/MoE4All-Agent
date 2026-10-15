@@ -198,13 +198,21 @@ class CapabilityCenter {
   async checkEngine(force) {
     try {
       const refresh = force || !this.state.engine?.checkedAt || Date.now() - this.state.engine.checkedAt > 6 * 60 * 60 * 1000;
-      const result = await this.engineRequest('/api/moe4all/release' + (refresh ? '?force=1' : ''));
+      let result = await this.engineRequest('/api/moe4all/release' + (refresh ? '?force=1' : ''));
       const runtime = await this.engineRequest('/api/moe4all/status');
+      // The manager's in-memory feed cache is empty after an Agent restart.
+      if (!refresh && !result.latest && !result.message && this.state.engine?.latest) {
+        const latest = this.state.engine.latest;
+        result = { ...result, latest, updateAvailable: latest.tag !== result.installed?.tag };
+      }
       const canInstall = result.supported && result.confirmedReleaseTag === true
         && (result.managed || (!runtime.executable && !result.installed && runtime.mode !== 'connect'));
       const checkError = result.message || (!refresh && !result.latest ? this.state.engine?.checkError : '') || '';
+      const installPhase = result.install?.stage ?? 'idle';
+      const phase = installPhase === 'idle' || installPhase === 'complete'
+        ? result.latest ? result.updateAvailable ? 'available' : 'current' : 'idle' : installPhase;
       this.state.engine = { ...result, runtime, canInstall, checkedAt: refresh ? Date.now() : this.state.engine.checkedAt,
-        checkError, phase: checkError && (!result.install || result.install.stage === 'idle') ? 'error' : result.install?.stage ?? 'idle',
+        checkError, phase: checkError && installPhase === 'idle' ? 'error' : phase,
         error: result.install?.error || checkError, managerUpdateRequired: result.supported && result.confirmedReleaseTag !== true };
     } catch (error) { this.state.engine = { phase: 'error', error: errorText(error), supported: false }; }
   }
