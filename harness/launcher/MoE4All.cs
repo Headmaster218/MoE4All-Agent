@@ -48,6 +48,11 @@ internal static class MoE4All
             Add("发现更新", "Update available"); Add("更新中...", "Updating..."); Add("检查中...", "Checking...");
             Add("首次启动", "FIRST LAUNCH"); Add("MOE4ALL AGENT  /  首次启动", "MOE4ALL AGENT  /  FIRST LAUNCH"); Add("专家正在登机", "Experts are boarding");
             Add("正在唤醒你的 Agent", "Waking up your Agent");
+            Add("专家正在收拾行李", "Experts are packing"); Add("专家正在返岗", "Experts are returning");
+            Add("专家正在前往登机口", "Heading to the gate"); Add("专家正在起飞", "Experts are taking off");
+            Add("专家正在飞往工作区", "En route to your workspace"); Add("专家正在降落", "Experts are landing");
+            Add("专家正在走向工作区", "Heading to your workspace"); Add("专家已经就位", "Experts are in position");
+            Add("正在准备独立工作区", "Preparing your workspace"); Add("正在完成最后检查", "Completing final checks");
             Add("这是第一次启动。MoE4All 正在准备 Agent 运行时、内置插件和独立工作区。只需一次，完成后会自动进入。", "Welcome to MoE4All. We are preparing the Agent runtime, built-in plugins and your workspace. This happens once; the Agent opens when everything is ready.");
             Add("正在连接本地运行时、内置插件和工作区，很快就好。", "Connecting your local runtime, plugins and workspace. Almost there.");
             Add("正在核验登机清单", "Checking the boarding list"); Add("正在检查本地运行时", "Checking the local runtime");
@@ -445,6 +450,8 @@ internal static class MoE4All
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        string screenshotDirectory = Path.Combine(root, "screenshots");
+        Directory.CreateDirectory(screenshotDirectory);
         using (AgentWindow testWindow = new AgentWindow(root, false))
         {
             if (Presentation.Theme != "green" || Presentation.Preference != "green")
@@ -455,8 +462,6 @@ internal static class MoE4All
             Application.DoEvents();
             testWindow.ValidateStartupSurfaceForTest();
             Size[] sizes = { new Size(760, 520), new Size(1024, 640), new Size(1280, 760) };
-            string screenshotDirectory = Path.Combine(root, "screenshots");
-            Directory.CreateDirectory(screenshotDirectory);
             foreach (string language in new string[] { "zh", "en" })
             foreach (string theme in new string[] { "green", "black", "gray", "white" })
             foreach (Size size in sizes)
@@ -484,11 +489,30 @@ internal static class MoE4All
                         testWindow.DrawToBitmap(bitmap, new Rectangle(0, 0, testWindow.Width, testWindow.Height));
                         bitmap.Save(Path.Combine(screenshotDirectory, language + "-" + theme + ".png"));
                     }
-
+                    testWindow.ValidateJourneyForTest(screenshotDirectory, language + "-" + theme);
                 }
             }
         }
-        Console.WriteLine("Startup UI passed: two languages, four palettes, three window sizes.");
+        string returningRoot = Path.Combine(root, "returning-fixture");
+        Directory.CreateDirectory(Path.Combine(returningRoot, "data", "home", "profiles", "web", "node_modules"));
+        using (AgentWindow returning = new AgentWindow(returningRoot, false))
+        {
+            returning.ShowInTaskbar = false;
+            returning.Opacity = 0;
+            returning.Show();
+            Application.DoEvents();
+            foreach (string language in new string[] { "zh", "en" })
+            foreach (string theme in new string[] { "green", "black", "gray", "white" })
+            {
+                returning.SetAppearanceForTest(language, theme);
+                string error;
+                if (!returning.ValidateStartupLayoutForTest(new Size(760, 520), out error))
+                    throw new InvalidOperationException("Returning startup layout: " + error);
+                returning.ValidateJourneyForTest(screenshotDirectory, "returning-" + language + "-" + theme);
+            }
+            returning.ValidateFailedJourneyForTest();
+        }
+        Console.WriteLine("Startup UI passed: first/returning launches, two languages, four palettes, three window sizes; journey phases, motion, reduced motion and failure state.");
         return 0;
     }
 
@@ -621,6 +645,183 @@ internal static class MoE4All
         }
     }
 
+    private sealed class ExpertJourney : Control
+    {
+        private readonly System.Windows.Forms.Timer animation;
+        private readonly Stopwatch clock = Stopwatch.StartNew();
+        private float position;
+        private int progress;
+        private bool failed;
+        private bool active = true;
+        private bool reducedMotion;
+        private double? testTime;
+
+        [DllImport("user32.dll")]
+        private static extern bool SystemParametersInfo(uint action, uint parameter, out bool value, uint flags);
+
+        public ExpertJourney()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
+                | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+            TabStop = false;
+            AccessibleRole = AccessibleRole.Graphic;
+            bool enabled;
+            reducedMotion = SystemParametersInfo(0x1042, 0, out enabled, 0) && !enabled;
+            animation = new System.Windows.Forms.Timer();
+            animation.Interval = 33;
+            animation.Tick += delegate
+            {
+                if (!Visible || !active || failed || reducedMotion) return;
+                Form owner = FindForm();
+                if (owner != null && owner.WindowState == FormWindowState.Minimized) return;
+                float step = Math.Max(0.35F, Math.Abs(progress - position) * 0.12F);
+                position += Math.Sign(progress - position) * Math.Min(step, Math.Abs(progress - position));
+                Invalidate();
+            };
+            animation.Start();
+        }
+
+        public int ProgressValue { get { return progress; } }
+        public bool IsFailed { get { return failed; } }
+        public void SetProgress(int value)
+        {
+            progress = Math.Max(0, Math.Min(100, value));
+            failed = false;
+            if (reducedMotion) position = progress;
+            Invalidate();
+        }
+        public void SetFailed() { failed = true; Invalidate(); }
+        public void Stop() { active = false; animation.Stop(); }
+        public void SetFrameForTest(int value, double seconds, bool still)
+        {
+            progress = value;
+            position = value;
+            failed = false;
+            reducedMotion = still;
+            testTime = seconds;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            if (Width < 2 || Height < 2) return;
+            Graphics g = e.Graphics;
+            g.Clear(Presentation.ColorFor("base"));
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float scale = Math.Min(Width / 640F, Height / 112F);
+            g.TranslateTransform((Width - 640 * scale) / 2, (Height - 112 * scale) / 2);
+            g.ScaleTransform(scale, scale);
+            double time = failed || reducedMotion ? 0 : testTime ?? clock.Elapsed.TotalSeconds;
+            float p = position;
+            using (Pen runway = new Pen(Presentation.ColorFor("border"), 1F))
+            {
+                g.DrawLine(runway, 8, 99, 632, 99);
+                runway.DashStyle = DashStyle.Dash;
+                g.DrawLine(runway, 8, 107, 632, 107);
+            }
+            using (Pen gate = new Pen(Presentation.ColorFor("faint"), 2F))
+            {
+                g.DrawLines(gate, new PointF[] { new PointF(12, 96), new PointF(12, 38), new PointF(46, 38) });
+                g.DrawLines(gate, new PointF[] { new PointF(598, 38), new PointF(628, 38), new PointF(628, 96) });
+                g.DrawLine(gate, 605, 47, 620, 47);
+                g.DrawLine(gate, 615, 42, 620, 47);
+                g.DrawLine(gate, 615, 52, 620, 47);
+            }
+
+            float planeX = 275, planeY = 74, tilt = 0;
+            if (p >= 30 && p < 70)
+            {
+                float t = (p - 30) / 40;
+                planeX += 230 * t;
+                planeY -= 34 * (float)Math.Sin(Math.PI * t);
+                planeY += reducedMotion || failed ? 0 : (float)Math.Sin(time * 2) * 1.5F;
+                tilt = -12 * (float)Math.Cos(Math.PI * t);
+            }
+            else if (p >= 70) planeX = 505;
+            DrawPlane(g, planeX, planeY, tilt, p > 32 && p < 68);
+            if (p < 30)
+            {
+                float walk = Math.Min(1, p / 25);
+                DrawExpert(g, 55 + walk * 193, 97, time, p < 25 ? 1 : Math.Max(0, (30 - p) / 5));
+            }
+            else if (p >= 78)
+            {
+                float walk = Math.Min(1, (p - 78) / 22);
+                DrawExpert(g, 527 + walk * 78, 97, p < 100 ? time : 0, 1);
+            }
+        }
+
+        private static void DrawPlane(Graphics g, float x, float y, float tilt, bool flying)
+        {
+            GraphicsState state = g.Save();
+            g.TranslateTransform(x, y);
+            g.RotateTransform(tilt);
+            using (SolidBrush body = new SolidBrush(Presentation.ColorFor("accent")))
+            using (SolidBrush windowBrush = new SolidBrush(Presentation.ColorFor("onAccent")))
+            using (Pen details = new Pen(Presentation.ColorFor("faint"), 2F))
+            using (GraphicsPath fuselage = new GraphicsPath())
+            {
+                fuselage.AddBezier(-45, -9, -12, -12, 25, -12, 35, -6);
+                fuselage.AddBezier(35, -6, 58, 4, 55, 9, 30, 10);
+                fuselage.AddLine(30, 10, -42, 10);
+                fuselage.CloseFigure();
+                g.FillPath(body, fuselage);
+                g.FillPolygon(body, new PointF[] { new PointF(-38, -7), new PointF(-50, -32), new PointF(-39, -32), new PointF(-20, -6) });
+                g.FillPolygon(body, new PointF[] { new PointF(-5, 3), new PointF(-22, 26), new PointF(-10, 26), new PointF(17, 3) });
+                for (int index = 0; index < 5; index++) g.FillEllipse(windowBrush, -25 + index * 11, -4, 4, 4);
+                g.FillPolygon(windowBrush, new PointF[] { new PointF(29, -5), new PointF(36, -3), new PointF(40, 0), new PointF(29, 0) });
+                if (flying)
+                {
+                    g.DrawLine(details, -80, -3, -58, -3);
+                    g.DrawLine(details, -72, 5, -55, 5);
+                }
+                else
+                {
+                    g.DrawLine(details, -27, 10, -27, 19);
+                    g.DrawLine(details, 28, 10, 28, 19);
+                    g.FillEllipse(windowBrush, -30, 18, 6, 6);
+                    g.FillEllipse(windowBrush, 25, 18, 6, 6);
+                }
+            }
+            g.Restore(state);
+        }
+
+        private static void DrawExpert(Graphics g, float x, float floor, double time, float opacity)
+        {
+            if (opacity <= 0) return;
+            int alpha = (int)(Math.Min(1, opacity) * 255);
+            Color ink = Color.FromArgb(alpha, Presentation.ColorFor("text"));
+            Color accent = Color.FromArgb(alpha, Presentation.ColorFor("accent"));
+            float stride = (float)Math.Sin(time * 9) * 5;
+            using (Pen limb = new Pen(ink, 3F))
+            using (Pen handle = new Pen(ink, 1.7F))
+            using (SolidBrush head = new SolidBrush(ink))
+            using (SolidBrush coat = new SolidBrush(accent))
+            {
+                limb.StartCap = limb.EndCap = LineCap.Round;
+                g.FillEllipse(head, x - 5, floor - 49, 11, 11);
+                g.FillRectangle(coat, x - 5, floor - 35, 12, 20);
+                g.DrawLine(limb, x, floor - 15, x - 4 + stride, floor - 2);
+                g.DrawLine(limb, x + 3, floor - 15, x + 8 - stride, floor - 2);
+                g.DrawLine(limb, x + 6, floor - 31, x + 14, floor - 23);
+                g.DrawLine(limb, x - 4, floor - 31, x - 10 - stride / 2, floor - 22);
+                g.DrawLine(handle, x + 14, floor - 23, x + 22, floor - 23);
+                g.DrawLine(handle, x + 22, floor - 23, x + 22, floor - 17);
+                g.FillRectangle(coat, x + 16, floor - 17, 14, 13);
+                g.DrawLine(handle, x + 20, floor - 14, x + 20, floor - 7);
+                g.FillEllipse(head, x + 17, floor - 4, 4, 4);
+                g.FillEllipse(head, x + 25, floor - 4, 4, 4);
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) animation.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class AppearanceButton : Button
     {
         private bool hovered;
@@ -652,6 +853,7 @@ internal static class MoE4All
         private readonly Label progressDetail;
         private readonly Label progressPercent;
         private readonly StartupProgressIndicator progressBar;
+        private readonly ExpertJourney journey;
         private readonly TextBox output;
         private readonly Panel startup;
         private readonly TableLayoutPanel startupLayout;
@@ -735,20 +937,20 @@ internal static class MoE4All
 
             startupLayout = new TableLayoutPanel();
             startupLayout.Dock = DockStyle.Fill;
-            startupLayout.Padding = new Padding(52, 38, 52, 28);
+            startupLayout.Padding = new Padding(28, 18, 28, 16);
             startupLayout.BackColor = BackColor;
             startupLayout.ColumnCount = 1;
             startupLayout.RowCount = 10;
             startupLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 66F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
-            startupLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 102F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
             startupLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             startup.Controls.Add(startupLayout);
 
@@ -761,9 +963,9 @@ internal static class MoE4All
             startupLayout.Controls.Add(eyebrow, 0, 0);
 
             startupHeading = new Label();
-            Presentation.SetCopy(startupHeading, firstLaunch ? "专家正在登机" : "正在唤醒你的 Agent");
+            Presentation.SetCopy(startupHeading, PreparationHeading(0));
             startupHeading.Dock = DockStyle.Fill;
-            startupHeading.Font = new Font("Microsoft YaHei UI", 24F, FontStyle.Bold);
+            startupHeading.Font = new Font("Microsoft YaHei UI", 21F, FontStyle.Bold);
             startupHeading.ForeColor = Presentation.ColorFor("text");
             startupHeading.TextAlign = ContentAlignment.MiddleLeft;
             startupLayout.Controls.Add(startupHeading, 0, 1);
@@ -777,6 +979,12 @@ internal static class MoE4All
             startupExplanation.ForeColor = Presentation.ColorFor("muted");
             startupExplanation.TextAlign = ContentAlignment.TopLeft;
             startupLayout.Controls.Add(startupExplanation, 0, 2);
+
+            journey = new ExpertJourney();
+            journey.Dock = DockStyle.Fill;
+            journey.Margin = Padding.Empty;
+            journey.AccessibleName = startupHeading.Text;
+            startupLayout.Controls.Add(journey, 0, 3);
 
             TableLayoutPanel progressHeader = new TableLayoutPanel();
             progressHeader.Dock = DockStyle.Fill;
@@ -970,6 +1178,7 @@ internal static class MoE4All
         private void RefreshAppearance()
         {
             Presentation.Refresh(this);
+            journey.AccessibleName = startupHeading.Text;
             browserButton.BackColor = BackColor;
             toolbarTip.SetToolTip(browserButton, Presentation.Translate("Open in browser"));
             browserButton.AccessibleName = Presentation.Translate("Open in browser");
@@ -1112,19 +1321,25 @@ internal static class MoE4All
                 workingArea.Top + (workingArea.Height - height) / 2, width, height);
         }
 
+        private string PreparationHeading(int percent)
+        {
+            if (percent < 10) return firstLaunch ? "专家正在收拾行李" : "专家正在返岗";
+            if (percent < 25) return "专家正在前往登机口";
+            if (percent < 30) return "专家正在登机";
+            if (percent < 45) return "专家正在起飞";
+            if (percent < 70) return "专家正在飞往工作区";
+            if (percent < 80) return "专家正在降落";
+            if (percent < 98) return "专家正在走向工作区";
+            return "专家已经就位";
+        }
+
         private string PreparationStage(int percent)
         {
-            if (!firstLaunch)
-            {
-                if (percent < 35) return "正在检查本地运行时";
-                if (percent < 85) return "正在连接插件与工作区";
-                return "Agent 即将醒来";
-            }
-            if (percent < 10) return "正在核验登机清单";
-            if (percent < 38) return "运行时正在装舱";
-            if (percent < 78) return "专家正在飞往本地工作区";
-            if (percent < 96) return "即将抵达，正在整理最后一排座位";
-            return "专家即将落地";
+            if (percent < 10) return firstLaunch ? "正在核验登机清单" : "正在检查本地运行时";
+            if (percent < 30) return firstLaunch ? "运行时正在装舱" : "正在复用已经准备好的本地资源。";
+            if (percent < 70) return firstLaunch ? "正在解压运行时、内置插件与工作区模板。" : "正在连接插件与工作区";
+            if (percent < 85) return "正在准备独立工作区";
+            return "正在完成最后检查";
         }
 
         private static string PreparationDetail(string message)
@@ -1147,7 +1362,7 @@ internal static class MoE4All
             startup.PerformLayout();
             startupLayout.PerformLayout();
 
-            Control[] primaryControls = { startupHeading, startupExplanation, progressText, progressBar, startupActions };
+            Control[] primaryControls = { startupHeading, startupExplanation, journey, progressText, progressBar, startupActions };
             foreach (Control control in primaryControls)
             {
                 if (!ControlFitsInside(control, startup, out error)) return false;
@@ -1169,8 +1384,67 @@ internal static class MoE4All
             Presentation.Preference = theme;
             Presentation.Theme = theme;
             RefreshAppearance();
-            string expected = language == "zh" ? "专家正在登机" : "Experts are boarding";
+            string expected = Presentation.Translate(PreparationHeading(journey.ProgressValue));
             if (startupHeading.Text != expected) throw new InvalidOperationException("Startup language did not switch.");
+        }
+
+        public void ValidateJourneyForTest(string directory, string name)
+        {
+            foreach (int percent in new int[] { 0, 10, 24, 25, 29, 30, 44, 45, 50, 69, 70, 79, 80, 97, 98, 100 })
+            {
+                UpdatePreparationProgress(percent, 100, "unpacking bundled runtime");
+                if (journey.ProgressValue != percent || progressBar.ProgressValue != percent
+                    || startupHeading.Text != Presentation.Translate(PreparationHeading(percent)))
+                    throw new InvalidOperationException("Journey is not synchronized to preparation progress.");
+                journey.SetFrameForTest(percent, 0, true);
+                using (Bitmap bitmap = new Bitmap(journey.Width, journey.Height))
+                {
+                    journey.DrawToBitmap(bitmap, journey.ClientRectangle);
+                    if (name == "zh-green" && percent % 10 == 0)
+                        bitmap.Save(Path.Combine(directory, name + "-journey-" + percent + ".png"));
+                }
+            }
+            string stillA = JourneyFrameDigest(15, 0, true);
+            string stillB = JourneyFrameDigest(15, 0.2, true);
+            string movingA = JourneyFrameDigest(15, 0, false);
+            string movingB = JourneyFrameDigest(15, 0.2, false);
+            if (stillA != stillB || movingA == movingB)
+                throw new InvalidOperationException("Journey motion or reduced-motion rendering failed.");
+            CompletePreparation();
+            if (journey.ProgressValue != 100 || preparingProgress || progressBar.ProgressValue != 100)
+                throw new InvalidOperationException("Journey completion changed startup readiness semantics.");
+            if (name == "zh-green")
+            {
+                journey.SetFrameForTest(100, 0, true);
+                using (Bitmap bitmap = new Bitmap(Width, Height))
+                {
+                    DrawToBitmap(bitmap, new Rectangle(0, 0, Width, Height));
+                    bitmap.Save(Path.Combine(directory, name + "-arrived.png"));
+                }
+            }
+            UpdatePreparationProgress(0, 100, "verifying bundled runtime");
+        }
+
+        private string JourneyFrameDigest(int percent, double seconds, bool still)
+        {
+            journey.SetFrameForTest(percent, seconds, still);
+            using (Bitmap bitmap = new Bitmap(journey.Width, journey.Height))
+            using (MemoryStream stream = new MemoryStream())
+            using (SHA256 hash = SHA256.Create())
+            {
+                journey.DrawToBitmap(bitmap, journey.ClientRectangle);
+                bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                return Convert.ToBase64String(hash.ComputeHash(stream.ToArray()));
+            }
+        }
+
+        public void ValidateFailedJourneyForTest()
+        {
+            UpdatePreparationProgress(45, 100, "unpacking bundled runtime");
+            FailUi("Fixture startup failure");
+            if (!journey.IsFailed || !bootstrapFailed || ready || preparingProgress
+                || startupHeading.Text != Presentation.Translate("启动遇到问题") || !detailsPanel.Visible)
+                throw new InvalidOperationException("Failure must stop the journey and preserve diagnostics.");
         }
 
         private static bool ControlFitsInside(Control control, Control ancestor, out string error)
@@ -1354,6 +1628,9 @@ internal static class MoE4All
             int value = total <= 0 ? 0 : (int)Math.Max(0, Math.Min(1000, completed * 1000 / total));
             int percent = value / 10;
             progressBar.SetProgress(value);
+            journey.SetProgress(percent);
+            Presentation.SetCopy(startupHeading, PreparationHeading(percent));
+            journey.AccessibleName = startupHeading.Text;
             Presentation.SetCopy(progressText, PreparationStage(percent));
             Presentation.SetCopy(progressDetail, PreparationDetail(message));
             Presentation.SetCopy(progressPercent, percent + "%");
@@ -1372,6 +1649,9 @@ internal static class MoE4All
                 return;
             }
             preparingProgress = false;
+            journey.SetProgress(100);
+            Presentation.SetCopy(startupHeading, "专家已经就位");
+            journey.AccessibleName = startupHeading.Text;
             Presentation.SetCopy(progressText, firstLaunch ? "专家已落地，正在唤醒 Agent" : "本地环境就绪，正在唤醒 Agent");
             Presentation.SetCopy(progressDetail, "正在启动桌面界面与本地服务。");
             Presentation.SetCopy(progressPercent, "启动中");
@@ -1458,6 +1738,7 @@ internal static class MoE4All
 
         private void OnAgentReady()
         {
+            journey.Stop();
             ready = true;
             Presentation.SetCopy(status, "Ready");
             status.ForeColor = Presentation.ColorFor("success");
@@ -1591,8 +1872,10 @@ internal static class MoE4All
             Presentation.SetCopy(status, "Needs attention");
             status.ForeColor = Presentation.ColorFor("error");
             Presentation.SetCopy(startupHeading, "启动遇到问题");
+            journey.AccessibleName = startupHeading.Text;
             Presentation.SetCopy(startupExplanation, "MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。");
             progressBar.SetFailed();
+            journey.SetFailed();
             Presentation.SetCopy(progressText, "需要处理后再继续");
             Presentation.SetCopy(progressDetail, message);
             Presentation.SetCopy(progressPercent, "已停止");

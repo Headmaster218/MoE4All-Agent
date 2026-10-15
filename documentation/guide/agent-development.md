@@ -29,6 +29,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Run-Agen
 
 八个自有插件统一在各自的 `main` 开发和提交；`.gitmodules` 的跟踪分支也固定为 `main`。先提交插件源码及对应的 `lib` 运行文件，再更新 Agent 的 gitlink 与 profile 依赖锁，最后提交 Agent `main`。普通构建使用已提交的固定 commit，不自动拉取远端分支，也不把版本号相同当作运行文件相同。
 
+profile 包锁必须从 `git -c core.autocrlf=false archive` 的快照生成，与 `Build-DevHarness.ps1 -UpdateProfileLock` 保持一致。不能用受本机换行转换影响的手工快照替代；包内容应匹配 Git blob，而非仅匹配本机工作树。
+
 ### 插件 CI 与 Release
 
 八个插件各有独立 CI/Release。引擎管理插件 `dsh-llm-moe4all` 已有源码构建、多个官方 DSH fixture 和安装/重启冒烟；其余七个插件新增 Windows/Linux 的已提交运行文件检查、离线测试及发布包校验。部分导入仓库缺少完整上游构建输入，后七者采用 `committed-runtime` 模式，不冒充从源码重建或完整 Agent 集成验收。
@@ -41,3 +43,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File harness/scripts/Run-Agen
 以上仅提供可供更新器使用的发布产物，不新增独立 OTA、自动安装、更新中心或用户配置迁移行为。各插件细节见其 `ci/README.md`。本机检查在统一 local-work 的 staging 快照中完成，不安装到运行中的 Agent/DSH。
 
 仅修改插件 Host 时，本地测试安装可单独更新该插件，不需要重新编译 DSH、桌面壳或引擎。更新前确认测试 Agent 已退出，备份原插件，校验新包与插件 commit 一致，再替换安装目录中的对应插件，并记录本地覆盖的 commit 和包校验值。不得替换用户配置、会话、记忆、模型或 KV；原始发行 ZIP 保持不变。此维护流程不等于已启用发行版内置插件的独立在线更新，后者仍遵循 Agent 统一更新策略。
+
+## 启动界面
+
+首次和后续启动共用原生轻量动画：专家拖行李登机、30% 后起飞、70% 左右落地、走向工作区。位置随运行时准备进度变化，不用定时器伪造百分比，也不为了播完动画而延迟进入 Agent；运行时完成后仍明确等待本地服务响应。失败时停住动画并展开原有诊断。界面沿用中英和四种配色，遵循 Windows 的减少动态效果设置；不依赖额外图片、浏览器页面或网络资源。
