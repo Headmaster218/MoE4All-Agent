@@ -847,7 +847,6 @@ internal static partial class MoE4All
     {
         private readonly string root;
         private readonly bool firstLaunch;
-        private readonly Label status;
         private readonly Label startupHeading;
         private readonly Label startupExplanation;
         private readonly Label progressText;
@@ -906,27 +905,16 @@ internal static partial class MoE4All
             ForeColor = Presentation.ColorFor("text");
             Font = new Font("Segoe UI", 9F);
 
-            Panel toolbar = new Panel();
-            toolbar.Dock = DockStyle.Top;
-            toolbar.Height = 30;
-            toolbar.BackColor = BackColor;
-            status = new Label();
-            status.AutoSize = false;
-            status.Size = new Size(160, 24);
-            status.Location = new Point(12, 3);
-            Presentation.SetCopy(status, "Starting");
-            toolbar.Controls.Add(status);
             browserButton = new AppearanceButton();
             browserButton.Text = "\uE774";
             browserButton.Font = new Font("Segoe MDL2 Assets", 12F);
             browserButton.AccessibleName = Presentation.Translate("Open in browser");
-            browserButton.Dock = DockStyle.Right;
             browserButton.Width = 34;
+            browserButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             browserButton.FlatStyle = FlatStyle.Flat;
             browserButton.FlatAppearance.BorderSize = 0;
             browserButton.UseVisualStyleBackColor = false;
             browserButton.Click += delegate { OpenUrl("http://127.0.0.1:" + WebPort + "/"); };
-            toolbar.Controls.Add(browserButton);
             webView = new WebView2();
             webView.Dock = DockStyle.Fill;
             webView.Visible = false;
@@ -1102,7 +1090,8 @@ internal static partial class MoE4All
 
             Controls.Add(webView);
             Controls.Add(startup);
-            Controls.Add(toolbar);
+            Controls.Add(browserButton);
+            EnableDesktopChrome();
             RefreshAppearance();
             Load += delegate { FitToWorkingArea(); RestoreDesktopWindow(); desktopWindowLoaded = true; ApplyWindowTheme(Handle); };
             ResizeEnd += delegate { SaveDesktopWindow(); };
@@ -1625,10 +1614,6 @@ internal static partial class MoE4All
                 catch (InvalidOperationException) { }
                 return;
             }
-            if (isError) Presentation.SetCopy(status, "Needs attention");
-            else if (ready) Presentation.SetCopy(status, "Ready");
-            else if (!preparingProgress) Presentation.SetCopy(status, "Starting");
-            if (isError) status.ForeColor = Presentation.ColorFor("error");
             output.AppendText(message + Environment.NewLine);
             if (bootstrapFailed) PushStartupState();
         }
@@ -1652,8 +1637,6 @@ internal static partial class MoE4All
             Presentation.SetCopy(progressText, PreparationStage(percent));
             Presentation.SetCopy(progressDetail, PreparationDetail(message));
             Presentation.SetCopy(progressPercent, percent + "%");
-            Presentation.SetCopy(status, "Preparing " + percent + "%");
-            status.ForeColor = Presentation.ColorFor("muted");
             PushStartupState();
         }
 
@@ -1674,7 +1657,6 @@ internal static partial class MoE4All
             Presentation.SetCopy(progressDetail, "正在启动桌面界面与本地服务。");
             Presentation.SetCopy(progressPercent, "启动中");
             progressBar.SetIndeterminate();
-            Presentation.SetCopy(status, "Starting");
             PushStartupState();
         }
 
@@ -1762,9 +1744,6 @@ internal static partial class MoE4All
         {
             journey.Stop();
             ready = true;
-            Presentation.SetCopy(status, "Ready");
-            status.ForeColor = Presentation.ColorFor("success");
-            status.Visible = false;
             ActivateWebView();
             StartCapabilityChecks();
         }
@@ -1785,6 +1764,7 @@ internal static partial class MoE4All
                 webView.CoreWebView2.WebMessageReceived += ReceiveAppearance;
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
+                await InitializeDesktopChrome();
                 webView.CoreWebView2.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; OpenUrl(e.Uri); };
                 webView.CoreWebView2.NavigationStarting += delegate(object sender, CoreWebView2NavigationStartingEventArgs e)
                 {
@@ -1829,6 +1809,7 @@ internal static partial class MoE4All
             startup.Visible = false;
             webView.Visible = true;
             webView.BringToFront();
+            LayoutDesktopChrome();
         }
         private async void PushStartupState()
         {
@@ -1891,8 +1872,6 @@ internal static partial class MoE4All
             ready = false;
             bootstrapFailed = true;
             preparingProgress = false;
-            Presentation.SetCopy(status, "Needs attention");
-            status.ForeColor = Presentation.ColorFor("error");
             Presentation.SetCopy(startupHeading, "启动遇到问题");
             journey.AccessibleName = startupHeading.Text;
             Presentation.SetCopy(startupExplanation, "MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。");

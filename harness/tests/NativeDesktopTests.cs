@@ -18,6 +18,7 @@ internal static class NativeDesktopTests
             Application.SetCompatibleTextRenderingDefault(false);
             string area = args.Length > 0 ? args[0] : "picker";
             if (area == "picker") Picker(args.Length > 1 && args[1] == "--dialogs");
+            else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
             else throw new ArgumentException("Unknown native test area.");
             return 0;
         } catch (Exception error) { Console.Error.WriteLine(error); return 1; }

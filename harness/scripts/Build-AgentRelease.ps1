@@ -154,7 +154,7 @@ if ($BaseArchive) {
     }
     Copy-Item -LiteralPath (Join-Path $root 'harness\capabilities') -Destination $stageHarness -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'vendor') -Destination (Join-Path $stageHarness 'scripts\vendor') -Recurse -Force
-    foreach ($launcherSource in @('MoE4All.cs', 'CapabilityCenter.cs', 'DesktopPicker.cs', 'DesktopWindow.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
+    foreach ($launcherSource in @('MoE4All.cs', 'CapabilityCenter.cs', 'DesktopPicker.cs', 'NativeDialogTheme.cs', 'DesktopChrome.cs', 'DesktopWindow.cs', 'MoE4All.exe.manifest', 'MoE4All.exe.config', 'Startup.html')) {
         Copy-Item -LiteralPath (Join-Path $root "harness\launcher\$launcherSource") -Destination (Join-Path $stageHarness "launcher\$launcherSource") -Force
     }
     $stageLauncherVendor = Join-Path $stageHarness 'launcher\vendor'
