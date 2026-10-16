@@ -15,10 +15,12 @@ internal static class NativeDesktopTests
     {
         try {
             Application.EnableVisualStyles();
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
             Application.SetCompatibleTextRenderingDefault(false);
             string area = args.Length > 0 ? args[0] : "picker";
             if (area == "picker") Picker(args.Length > 1 && args[1] == "--dialogs");
             else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
+            else if (area == "picker-light") ProbeDialog("white", "directory");
             else throw new ArgumentException("Unknown native test area.");
             return 0;
         } catch (Exception error) { Console.Error.WriteLine(error); return 1; }
@@ -55,20 +57,34 @@ internal static class NativeDesktopTests
         foreach (string theme in new string[] { "green", "gray", "black" }) Check(NativeDialogTheme.Mode(theme, false) == 2, "Dark palette must request native dark mode.");
         Check(NativeDialogTheme.Mode("white", false) == 3, "White palette must request native light mode.");
         Check(NativeDialogTheme.Mode("black", true) == 0, "Preserve Windows high contrast.");
-        if (dialogs) foreach (string theme in new string[] { "white", "gray" })
-            foreach (string kind in new string[] { "directory", "model", "engine" }) ProbeDialog(theme, kind);
-        Console.WriteLine("Picker passed: modern COM, all three modes, initial folder, filters, owner requirement, dark/light/high-contrast policy" + (dialogs ? ", owned themed Explorer dialogs and cancellation." : "."));
+        if (dialogs) {
+            foreach (string theme in new string[] { "white", "gray" })
+                foreach (string kind in new string[] { "directory", "model", "engine" }) ProbeDialog(theme, kind);
+            foreach (string kind in new string[] { "directory", "model", "engine" }) ProbeDialog("gray", kind, true);
+        }
+        Console.WriteLine("Picker passed: modern COM, all three modes, initial folder, filters, owner requirement, dark/light/high-contrast policy" + (dialogs ? ", owned modal Explorer dialogs, foreground restore, selection and cancellation." : "."));
     }
 
-    private static void ProbeDialog(string theme, string kind)
+    private static void ProbeDialog(string theme, string kind, bool accept = false)
     {
         using (Form owner = new Form())
         using (Timer cancel = new Timer()) {
             owner.ShowInTaskbar = false;
             owner.Show();
-            Console.WriteLine("Opening " + theme + " " + kind + " Explorer dialog.");
+            bool wasMaximized = accept && kind == "directory";
+            if (wasMaximized) owner.WindowState = FormWindowState.Maximized;
+            owner.WindowState = FormWindowState.Minimized;
+            MoE4All.NativePicker.PrepareOwner(owner);
+            Check(owner.WindowState != FormWindowState.Minimized && !owner.TopMost, "Selection restores its own window without making it globally topmost.");
+            if (wasMaximized) Check(owner.WindowState == FormWindowState.Maximized, "Restoring for selection must preserve the previous maximized state.");
+            Console.WriteLine("Opening " + theme + " " + kind + " Explorer dialog (" + (accept ? "select" : "cancel") + ").");
             using (NativeDialogTheme colors = new NativeDialogTheme(owner.Handle, theme)) {
             MoE4All.NativePicker.IFileDialog dialog = MoE4All.NativePicker.Create(kind, Environment.CurrentDirectory);
+            string expected = kind == "directory" ? Environment.CurrentDirectory : Path.Combine(Environment.CurrentDirectory, kind == "model" ? "fixture.GGUF" : "infr.exe");
+            if (accept) {
+                if (kind != "directory") File.WriteAllText(expected, "Picker fixture; not an executable or model.");
+                if (kind != "directory") dialog.SetFileName(Path.GetFileName(expected));
+            }
             bool owned = false, darkMatches = false;
             cancel.Interval = 600;
             int ticks = 0;
@@ -82,6 +98,7 @@ internal static class NativeDesktopTests
                     return true;
                 }, IntPtr.Zero);
                 owned = popup != IntPtr.Zero && popup != owner.Handle && GetWindow(popup, 4) == owner.Handle;
+                if (owned) Check(!IsWindowEnabled(owner.Handle) && IsWindowVisible(popup), "Picker must be a visible modal above all content in its disabled owner.");
                 int dark;
                 int hr = DwmGetWindowAttribute(popup, 20, out dark, 4);
                 darkMatches = hr != 0 || dark == (theme == "white" ? 0 : 1);
@@ -94,12 +111,14 @@ internal static class NativeDesktopTests
                             capture.Save(Path.Combine(Environment.CurrentDirectory, theme + "-" + kind + ".png"), ImageFormat.Png);
                         }
                     }
-                    MoE4All.NativePicker.CancelOwnedDialog(owner.Handle);
+                    if (accept && owned) PostMessage(GetDlgItem(popup, 1), 0xf5, IntPtr.Zero, IntPtr.Zero);
+                    else MoE4All.NativePicker.CancelOwnedDialog(owner.Handle);
                 }
             };
             try {
                 cancel.Start();
-                Check(MoE4All.NativePicker.Show(dialog, owner.Handle, kind) == null, "Cancellation must return no path.");
+                string selected = MoE4All.NativePicker.Show(dialog, owner.Handle, kind);
+                Check(accept ? selected == Path.GetFullPath(expected) : selected == null, "Selection/cancellation returned an incorrect path.");
                 Check(owned, "Dialog must be owned by the Agent, not the desktop or Node.");
                 Check(darkMatches, "Native dialog title bar must follow the selected light/dark mode.");
             } finally { cancel.Stop(); Marshal.ReleaseComObject(dialog); }
@@ -108,6 +127,10 @@ internal static class NativeDesktopTests
     }
 
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern IntPtr GetDlgItem(IntPtr window, int id);
+    [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out Rect bounds);
     private delegate bool EnumWindow(IntPtr window, IntPtr state);

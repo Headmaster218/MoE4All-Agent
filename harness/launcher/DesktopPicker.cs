@@ -18,6 +18,13 @@ internal static partial class MoE4All
     {
         internal const int Cancelled = unchecked((int)0x800704c7);
         private delegate bool EnumWindow(IntPtr window, IntPtr state);
+        internal static void PrepareOwner(Form owner)
+        {
+            if (owner == null || owner.IsDisposed || !owner.IsHandleCreated) throw new ArgumentException("A live Agent window is required.");
+            if (owner.WindowState == FormWindowState.Minimized) ShowWindow(owner.Handle, 9);
+            owner.Activate();
+            owner.BringToFront();
+        }
         internal static void CancelOwnedDialog(IntPtr owner)
         {
             EnumThreadWindows(GetCurrentThreadId(), delegate(IntPtr window, IntPtr state) {
@@ -126,6 +133,7 @@ internal static partial class MoE4All
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder value, int count);
         [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
         [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
     }
 
     private sealed partial class AgentWindow
@@ -142,6 +150,7 @@ internal static partial class MoE4All
                     if (closing || !ready || pickerCompletion != null) { completion.TrySetResult(null); return; }
                     pickerCompletion = completion;
                     try {
+                        NativePicker.PrepareOwner(this);
                         using (NativeDialogTheme theme = new NativeDialogTheme(Handle, Presentation.Theme)) {
                             activePicker = NativePicker.Create(kind, initial);
                             completion.TrySetResult(NativePicker.Show(activePicker, Handle, kind));

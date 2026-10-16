@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('picker','chrome')][string]$Area = 'picker',
+    [ValidateSet('picker','picker-light','chrome')][string]$Area = 'picker',
     [switch]$Dialogs
 )
 $ErrorActionPreference = 'Stop'
