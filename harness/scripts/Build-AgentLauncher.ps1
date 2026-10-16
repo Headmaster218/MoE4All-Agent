@@ -34,6 +34,7 @@ $nativeArgs = @(
     '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
     ("/reference:$core"), ("/reference:$forms"),
     ('/resource:' + $startupPage + ',MoE4All.Startup.html'),
+    ('/resource:' + (Join-Path $root 'harness\launcher\DesktopChrome.js') + ',MoE4All.DesktopChrome.js'),
     ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source, $capabilitiesSource, $pickerSource, $windowSource, $dialogThemeSource, $chromeSource
 )
 & $compiler @nativeArgs

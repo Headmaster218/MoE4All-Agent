@@ -1,7 +1,8 @@
 using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
-using System.Web.Script.Serialization;
+using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
 
 internal static partial class MoE4All
@@ -38,7 +39,23 @@ internal static partial class MoE4All
             SizeChanged += delegate { LayoutDesktopChrome(); };
             webView.ZoomFactorChanged += delegate { LayoutDesktopChrome(); };
             HandleCreated += delegate { BeginInvoke(new Action(LayoutDesktopChrome)); };
+            WireStartupDrag(startup);
         }
+
+        private void WireStartupDrag(Control surface)
+        {
+            surface.MouseDown += delegate(object sender, MouseEventArgs e) {
+                if (!integratedChrome || !startup.Visible || e.Button != MouseButtons.Left) return;
+                Point point = ((Control)sender).PointToScreen(e.Location);
+                Point local = PointToClient(point);
+                if (local.Y < 6 * DeviceDpi / 96 || local.Y >= 36 * DeviceDpi / 96 || local.X >= browserButton.Left) return;
+                ReleaseCapture();
+                SendMessage(Handle, 0xa1, new IntPtr(2), new IntPtr((point.Y << 16) | (point.X & 0xffff)));
+            };
+            foreach (Control child in surface.Controls) WireStartupDrag(child);
+        }
+
+        [DllImport("user32.dll")] private static extern bool ReleaseCapture();
 
         protected override void WndProc(ref Message message)
         {
@@ -121,13 +138,9 @@ internal static partial class MoE4All
 
         internal static string ChromeScript(int inset)
         {
-            return "(()=>{document.documentElement.dataset.moe4allDesktop='integrated';document.documentElement.style.setProperty('--moe4all-caption-width'," + new JavaScriptSerializer().Serialize(Math.Max(0, inset) + "px") + ");if(document.getElementById('moe4all-native-chrome'))return;const s=document.createElement('style');s.id='moe4all-native-chrome';s.textContent="
-                + new JavaScriptSerializer().Serialize(
-                    "[data-moe4all-drag]{app-region:drag;-webkit-app-region:drag}"
-                    + "[data-moe4all-drag] :is(button,a,input,select,textarea,[role=button],[contenteditable]){app-region:no-drag;-webkit-app-region:no-drag}"
-                    + "[data-details-collapsed] [data-moe4all-caption=conversation],[data-moe4all-caption=details]{padding-right:calc(var(--moe4all-caption-width) + 12px);min-height:38px;box-sizing:border-box}"
-                    + "[data-moe4all-caption=conversation] [aria-label]{app-region:no-drag;-webkit-app-region:no-drag}")
-                + ";document.head.append(s)})()";
+            using (Stream resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("MoE4All.DesktopChrome.js"))
+            using (StreamReader reader = new StreamReader(resource))
+                return reader.ReadToEnd().Replace("__MOE4ALL_CAPTION_WIDTH__", Math.Max(0, inset).ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         private async System.Threading.Tasks.Task InitializeDesktopChrome()

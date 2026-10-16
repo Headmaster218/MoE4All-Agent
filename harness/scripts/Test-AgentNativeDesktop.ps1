@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('picker','picker-light','chrome')][string]$Area = 'picker',
+    [ValidateSet('picker','picker-light','chrome','chrome-live')][string]$Area = 'picker',
     [switch]$Dialogs
 )
 $ErrorActionPreference = 'Stop'
@@ -15,6 +15,7 @@ $arguments = @('/nologo','/target:exe','/platform:x64','/codepage:65001','/main:
     ('/reference:' + (Join-Path $vendor 'Microsoft.Web.WebView2.Core.dll')),
     ('/reference:' + (Join-Path $vendor 'Microsoft.Web.WebView2.WinForms.dll')),
     ('/resource:' + (Join-Path $root 'harness\launcher\Startup.html') + ',MoE4All.Startup.html'),
+    ('/resource:' + (Join-Path $root 'harness\launcher\DesktopChrome.js') + ',MoE4All.DesktopChrome.js'),
     ('/win32manifest:' + (Join-Path $root 'harness\launcher\MoE4All.exe.manifest')),
     ('/out:' + $exe))
 $arguments += @(Get-ChildItem -LiteralPath (Join-Path $root 'harness\launcher') -Filter '*.cs' -File | ForEach-Object { $_.FullName })

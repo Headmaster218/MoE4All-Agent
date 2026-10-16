@@ -20,6 +20,7 @@ internal static class NativeDesktopTests
             string area = args.Length > 0 ? args[0] : "picker";
             if (area == "picker") Picker(args.Length > 1 && args[1] == "--dialogs");
             else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
+            else if (area == "chrome-live") MoE4All.ValidateLiveChrome(Environment.CurrentDirectory);
             else if (area == "picker-light") ProbeDialog("white", "directory");
             else throw new ArgumentException("Unknown native test area.");
             return 0;
@@ -138,4 +139,102 @@ internal static class NativeDesktopTests
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder value, int count);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+}
+
+internal static partial class MoE4All
+{
+    internal static void ValidateLiveChrome(string root)
+    {
+        Exception failure = null;
+        using (AgentWindow window = new AgentWindow(root, false)) {
+            window.Shown += delegate { window.BeginInvoke(new Action(delegate {
+                try { window.ValidateLiveChromeForTest(); }
+                catch (Exception error) { failure = error; }
+                finally { window.Close(); }
+            })); };
+            Application.Run(window);
+        }
+        if (failure != null) throw failure;
+    }
+
+    private sealed partial class AgentWindow
+    {
+        [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+        [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+
+        private static T Pump<T>(System.Threading.Tasks.Task<T> task)
+        {
+            PumpUntil(delegate { return task.IsCompleted; });
+            return task.GetAwaiter().GetResult();
+        }
+
+        private static void PumpUntil(Func<bool> done)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            while (!done()) {
+                if (watch.ElapsedMilliseconds > 10000) throw new TimeoutException("Live chrome fixture timed out.");
+                Application.DoEvents(); System.Threading.Thread.Sleep(10);
+            }
+        }
+
+        private void MovePointer(Point local, bool drag)
+        {
+            Activate(); Application.DoEvents();
+            NativeDesktopTests.Check(GetForegroundWindow() == Handle, "Only the isolated test window may receive mouse input.");
+            Point from = PointToScreen(local);
+            Exception failure = null;
+            var worker = new System.Threading.Thread(delegate() {
+                try {
+                    SetCursorPos(from.X, from.Y);
+                    mouse_event(2, 0, 0, 0, UIntPtr.Zero);
+                    System.Threading.Thread.Sleep(120);
+                    if (drag) {
+                        for (int step = 1; step <= 6; step++) {
+                            SetCursorPos(from.X + step * 10, from.Y + step * 5);
+                            System.Threading.Thread.Sleep(40);
+                        }
+                    }
+                } catch (Exception error) { failure = error; }
+                finally { mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
+            });
+            worker.IsBackground = true; worker.Start();
+            PumpUntil(delegate { return !worker.IsAlive; });
+            if (failure != null) throw failure;
+            Application.DoEvents();
+        }
+
+        internal void ValidateLiveChromeForTest()
+        {
+            Show(); WindowState = FormWindowState.Normal;
+            Bounds = new Rectangle(100, 100, 1100, 800);
+            Application.DoEvents(); LayoutDesktopChrome();
+            Rectangle before = Bounds;
+            MovePointer(new Point(400, 18), true);
+            NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Native startup surface must drag the window.");
+            var environment = Pump(Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(null,
+                Path.Combine(root, "webview-fixture"), new Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions("--disable-gpu")));
+            var initialize = webView.EnsureCoreWebView2Async(environment);
+            PumpUntil(delegate { return initialize.IsCompleted; }); initialize.GetAwaiter().GetResult();
+            var chrome = InitializeDesktopChrome();
+            PumpUntil(delegate { return chrome.IsCompleted; }); chrome.GetAwaiter().GetResult();
+            bool navigated = false;
+            webView.CoreWebView2.NavigationCompleted += delegate { navigated = true; };
+            webView.CoreWebView2.NavigateToString("<!doctype html><html><head></head><body style='background:#303530;color:white;margin:0'><button id='action' style='position:absolute;left:180px;top:8px' onclick='window.clicks++'>Action</button><script>window.clicks=0</script><p style='margin-top:60px'>Isolated chrome fixture; no Agent or backend service.</p></body></html>");
+            PumpUntil(delegate { return navigated; });
+            startup.Visible = false; webView.Visible = true; webView.BringToFront(); LayoutDesktopChrome();
+            NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("!!document.getElementById('moe4all-native-drag-region')")) == "true", "Document-created script must install its drag surface.");
+            before = Bounds;
+            MovePointer(new Point(400, 18), true);
+            NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Blank WebView top area must drag the native window.");
+            before = Bounds;
+            Console.WriteLine("Live button geometry: dpi=" + DeviceDpi + ", zoom=" + webView.ZoomFactor + ", " + Pump(webView.CoreWebView2.ExecuteScriptAsync("JSON.stringify({rect:document.getElementById('action').getBoundingClientRect().toJSON(),region:getComputedStyle(document.getElementById('action')).webkitAppRegion})")));
+            MovePointer(new Point(205, 18), false);
+            System.Threading.Thread.Sleep(150); Application.DoEvents();
+            NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("window.clicks")) == "1", "Top-row interactive controls must receive clicks.");
+            NativeDesktopTests.Check(Bounds == before, "Clicking a top-row control must not move the window.");
+            Console.WriteLine("Live chrome passed: actual startup and WebView dragging, document-created installation, clickable top-row button. No Agent/backend started.");
+            Close();
+        }
+    }
 }

@@ -12,10 +12,13 @@ await mkdir(outputPath, { recursive: true })
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--disable-gpu'] })
 try {
   const page = await browser.newPage()
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.addInitScript({ content: script })
   for (const width of [980, 1380, 1920]) {
     await page.setViewportSize({ width, height: 800 })
     for (const details of [false, true]) {
-      await page.setContent(`<style>
+      await page.goto('data:text/html,' + encodeURIComponent(`<style>
         *{box-sizing:border-box}body{margin:0;font-family:Arial;background:#202421;color:#e4e9e5}
         main{display:grid;grid-template-columns:240px minmax(0,1fr) ${details ? '320px' : '0px'};height:100vh}
         header{height:38px;display:flex;align-items:center;justify-content:space-between;padding:4px 12px;gap:12px}
@@ -25,7 +28,9 @@ try {
         <aside><header data-moe4all-drag><button>MoE4All</button><button>Menu</button></header></aside>
         <section><header data-moe4all-drag data-moe4all-caption="conversation"><h1>Conversation</h1><button id="conversation-action">Actions</button></header></section>
         <section><header data-moe4all-drag data-moe4all-caption="details"><h1>Details</h1><button id="details-action">Close</button></header></section>
-        </main><div id="native"></div>`)
+        </main><div id="native"></div>`))
+      assert.deepEqual(errors, [], 'Document-created injection must not access missing DOM roots')
+      assert.equal(await page.locator('#moe4all-native-chrome').count(), 1, 'Chrome must be installed by document-created injection, not a later manual call')
       await page.evaluate(script)
       await page.evaluate(script)
       const result = await page.evaluate((details) => {
