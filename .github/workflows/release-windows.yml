@@ -4,6 +4,11 @@ on:
   push:
     tags: ['release-*']
   workflow_dispatch:
+    inputs:
+      source_tag:
+        description: 'Rebuild an existing release-* tag without moving it'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -30,6 +35,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          ref: ${{ inputs.source_tag || github.ref }}
       - name: Validate main and release version
         id: version
         run: |
@@ -42,7 +48,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Release commit must belong to main.' }
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) { throw 'Tag and agent-build.json differ.' }
           if ($env:GITHUB_REF_TYPE -ne 'tag' -and $env:GITHUB_REF_NAME -ne 'main') { throw 'Manual builds must use main.' }
+          if ($env:SOURCE_TAG) {
+            if ($env:SOURCE_TAG -ne $tag) { throw 'Requested tag and agent-build.json differ.' }
+            $commit = (git rev-parse "$tag^{commit}").Trim()
+            if ($LASTEXITCODE -ne 0 -or $commit -ne (git rev-parse HEAD).Trim()) { throw 'Checkout differs from the requested release tag.' }
+          }
           "tag=$tag" >> $env:GITHUB_OUTPUT
+        env:
+          SOURCE_TAG: ${{ inputs.source_tag }}
       - name: Build frozen desktop distribution
         run: |
           ./harness/scripts/Test-AgentBuild.ps1
@@ -57,8 +70,8 @@ jobs:
           ./harness/scripts/Test-AgentNodeResolution.ps1 -Launcher $launcher -OutputDirectory (Join-Path $env:RUNNER_TEMP 'agent-node-resolution')
           ./harness/scripts/Test-AgentUpdateVersion.ps1
           ./harness/scripts/Test-AgentProfilePayload.ps1
-          ./harness/scripts/Test-AgentUpdate.ps1
-          ./harness/scripts/Test-AgentUpdate.ps1 -LegacyTags
+          ./harness/scripts/Test-AgentUpdate.ps1 -NodeExecutable $node
+          ./harness/scripts/Test-AgentUpdate.ps1 -LegacyTags -NodeExecutable $node
           ./harness/scripts/Test-AgentLauncher.ps1
       - name: Cold ZIP startup and relocated startup
         run: |
@@ -86,7 +99,7 @@ jobs:
             artifacts/release-smoke/*.png
           if-no-files-found: error
       - name: Create CI-built release draft for final acceptance
-        if: startsWith(github.ref, 'refs/tags/release-')
+        if: startsWith(github.ref, 'refs/tags/release-') || inputs.source_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
