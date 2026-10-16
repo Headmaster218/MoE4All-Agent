@@ -77,14 +77,17 @@ jobs:
         run: |
           $zip = Get-ChildItem artifacts/agent-release -Filter '*.zip' | Select-Object -First 1
           ./harness/scripts/Test-AgentRelease.ps1 -Archive $zip.FullName
-          $runs = @(Get-Content artifacts/release-smoke/startup.json -Raw | ConvertFrom-Json)
-          $env:MOE4ALL_TEST_PROFILE = Join-Path $runs[-1].install 'data\home\profiles\web'
-          $node = Join-Path $runs[-1].install 'node.exe'
+          $runs = Get-Content artifacts/release-smoke/startup.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $final = $runs | Where-Object { $_.phase -eq 'relocated' } | Select-Object -Last 1
+          if (-not $final -or $final.install -isnot [string]) { throw 'Relocated startup report is missing.' }
+          $env:MOE4ALL_TEST_PROFILE = Join-Path $final.install 'data\home\profiles\web'
+          $node = Join-Path $final.install 'node.exe'
+          if (-not (Test-Path -LiteralPath $node -PathType Leaf)) { throw 'Relocated Node runtime is missing.' }
           & $node --test harness/scripts/Test-AgentProfile.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Plugin archive provenance regression tests failed.' }
           $env:MOE4ALL_CAPABILITY_TEST_ROOT = Join-Path $env:RUNNER_TEMP 'moe4all-capability-tests'
           New-Item -ItemType Directory -Path $env:MOE4ALL_CAPABILITY_TEST_ROOT -Force | Out-Null
-          $env:MOE4ALL_CAPABILITY_TEST_TOOLS = Join-Path $runs[-1].install 'harness\runtime\update-tools'
+          $env:MOE4ALL_CAPABILITY_TEST_TOOLS = Join-Path $final.install 'harness\runtime\update-tools'
           $env:MOE4ALL_CAPABILITY_REAL_PROFILE = $env:MOE4ALL_TEST_PROFILE
           & $node --test harness/capabilities/center.test.cjs harness/capabilities/profile.integration.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Capability update, cold switch and rollback regression tests failed.' }
