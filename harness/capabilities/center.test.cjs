@@ -239,6 +239,11 @@ test('release channel, fixed source, required host range, and Agent compatibilit
   assert.equal(release.selectRelease([p.row], item, '1.0.0', true, semver).version, '1.1.0-preview.1');
   assert.equal(release.previewVersion('1.1.0-moe4all.1', semver), false);
   assert.equal(release.previewVersion('1.1.0-moe4all.1.preview.1', semver), true);
+  const stable = await publish(f, '1.1.0-moe4all.2');
+  stable.row.prerelease = false;
+  assert.equal(release.selectRelease([p.row, stable.row], item, '1.1.0-moe4all.1', false, semver).version, '1.1.0-moe4all.2');
+  stable.row.prerelease = true;
+  assert.equal(release.selectRelease([stable.row], item, '1.1.0-moe4all.1', false, semver), null);
   assert.throws(() => release.assetUrl('https://example.com/file.tgz', item, p.row.tag_name));
   assert.throws(() => release.assetUrl(p.prefix.replace('test-plugin/', 'another/') + 'test-plugin.tgz', item, p.row.tag_name));
   assert.throws(() => release.checkCompatibility({ peerDependencies: { '@deepseek-ai/cordis': '^4.0.0' } }, host, semver), /unavailable/);
