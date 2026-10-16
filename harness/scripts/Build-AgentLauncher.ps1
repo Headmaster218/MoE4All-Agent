@@ -12,6 +12,7 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $OutputPath) -Force | Out
 $source = Join-Path $root 'harness\launcher\MoE4All.cs'
 $capabilitiesSource = Join-Path $root 'harness\launcher\CapabilityCenter.cs'
 $pickerSource = Join-Path $root 'harness\launcher\DesktopPicker.cs'
+$dialogThemeSource = Join-Path $root 'harness\launcher\NativeDialogTheme.cs'
 $windowSource = Join-Path $root 'harness\launcher\DesktopWindow.cs'
 $startupPage = Join-Path $root 'harness\launcher\Startup.html'
 $manifest = Join-Path $root 'harness\launcher\MoE4All.exe.manifest'
@@ -32,7 +33,7 @@ $nativeArgs = @(
     '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll',
     ("/reference:$core"), ("/reference:$forms"),
     ('/resource:' + $startupPage + ',MoE4All.Startup.html'),
-    ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source, $capabilitiesSource, $pickerSource, $windowSource
+    ('/win32manifest:' + $manifest), ('/out:' + $OutputPath), $source, $capabilitiesSource, $pickerSource, $windowSource, $dialogThemeSource
 )
 & $compiler @nativeArgs
 if ($LASTEXITCODE -ne 0) { throw "Launcher compilation failed with exit code $LASTEXITCODE" }
