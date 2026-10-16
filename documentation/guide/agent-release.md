@@ -37,10 +37,10 @@ Agent gitlink 与 profile lock 固定最新验收组合。为测试能力中心�
 1. 先在各子仓 main 收敛功能和修复，完成测试及 runtime 构建。本地验收可以暂不 push；正式发布前必须先 push 子仓 main，并确认其包含 Agent 要引用的提交。
 2. 在 Agent main 更新 `harness/distribution/agent-build.json` 和发行说明，提交子模块指针及 lockfile。确认远端能获取所有固定子仓提交后，再 push Agent main 和 `release-<version>` 标签。CI 拒绝版本不符或不属于 main 的提交。
 3. CI 构建 ZIP 和 SHA256，运行 bootstrap、updater、EXE 回归检查，并从 ZIP 测试全新启动及移动后的重启。
-4. CI 创建草稿 release。下载 CI 的原始资产，验证 SHA256，再用真实桌面 EXE 导入本地 Engine、加载已有模型并完成对话。
-5. 验收通过后将草稿公开。预览标签包含 `-preview.N`，发布为 prerelease。
+4. CI 创建草稿 release。下载 CI 的原始资产，核对远端大小与 SHA256，检查最终 ZIP 的全新启动、移动后重启、插件装载及更新流程；不得用本地重打包资产替换 CI 产物。
+5. 验收通过后将同一份 CI 草稿公开。`release-0.2.0` 这类无后缀标签发布为正式版；预览标签包含 `-preview.N`，发布为 prerelease。
 
-CI 不下载大模型，也不宣称 GPU 推理已验收。最终模型对话属于发布前人工环境验收；
+CI 不下载大模型，也不宣称 GPU 推理已验收。推理引擎独立发布，涉及模型执行路径的改动另需真实模型验收；Agent 界面与 OTA 发布应明确记录是否进行了模型对话，不以启动、更新测试冒充推理验收。
 本机证据按工作区磁盘规则进入统一生成物根目录的 `evidence/agent/<task-id>`，发行说明记录结论，不打包个人配置和模型路径。
 
 ## 本地构建
