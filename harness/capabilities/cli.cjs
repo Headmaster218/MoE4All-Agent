@@ -35,7 +35,7 @@ async function main() {
       case 'engine-bootstrap': result = await center.bootstrapEngine(); break;
       case 'engine-cancel': result = await center.engineCancel(); break;
       case 'prepare': result = await center.prepare(values.id, values.version, values.confirm); break;
-      case 'apply': result = await center.apply(); break;
+      case 'apply': result = { ...await center.apply(), profileRepairRequired: center.profileRepairRequired }; break;
       case 'healthy': result = await center.healthy(); break;
       case 'rollback': result = await center.rollback(values.confirm); break;
       case 'cancel': result = await center.cancel(); break;

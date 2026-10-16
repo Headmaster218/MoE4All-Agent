@@ -21,6 +21,7 @@ internal static class NativeDesktopTests
             if (area == "picker") Picker(args.Length > 1 && args[1] == "--dialogs");
             else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
             else if (area == "chrome-live") MoE4All.ValidateLiveChrome(Environment.CurrentDirectory);
+            else if (area == "startup-flow") MoE4All.ValidateStartupFlow(Environment.CurrentDirectory);
             else if (area == "picker-light") ProbeDialog("white", "directory");
             else throw new ArgumentException("Unknown native test area.");
             return 0;
@@ -143,6 +144,43 @@ internal static class NativeDesktopTests
 
 internal static partial class MoE4All
 {
+    internal static void ValidateStartupFlow(string root)
+    {
+        string node = Environment.GetEnvironmentVariable("MOE4ALL_TEST_NODE");
+        NativeDesktopTests.Check(File.Exists(node), "A pinned test Node runtime is required.");
+        File.Copy(node, Path.Combine(root, "node.exe"), true);
+        string scripts = Path.Combine(root, "harness", "scripts");
+        string capabilities = Path.Combine(root, "harness", "capabilities");
+        Directory.CreateDirectory(scripts); Directory.CreateDirectory(capabilities);
+        File.WriteAllText(Path.Combine(scripts, "Prepare-BundledRuntime.ps1"),
+            "param([string]$InstallRoot,[string]$StateRoot)\r\n[IO.File]::AppendAllText((Join-Path $InstallRoot 'prepare-count.txt'),'x')\r\nNew-Item -ItemType Directory -Path (Join-Path $StateRoot 'home/profiles/web/node_modules') -Force | Out-Null\r\nexit 0\r\n");
+        File.WriteAllText(Path.Combine(scripts, "Run-Agent.ps1"),
+            "param([string]$StateRoot,[string]$DesktopBridge,[string]$DesktopToken)\r\n[IO.File]::WriteAllText((Join-Path $StateRoot 'service-fixture.txt'),'stub; no server or backend')\r\nexit 0\r\n");
+        string marker = Path.Combine(root, "data", "service-fixture.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker));
+        foreach (string value in new string[] { "false", "true", "missing", "wrong-type", "error" }) {
+            File.Delete(Path.Combine(root, "prepare-count.txt")); File.Delete(marker);
+            string payload = value == "missing" ? "{}" : "{\"profileRepairRequired\":" + (value == "wrong-type" ? "\"false\"" : value == "error" ? "false" : value) + "}";
+            File.WriteAllText(Path.Combine(capabilities, "cli.cjs"),
+                "process.stdout.write('@@MOE4ALL_CAPABILITIES\\t' + " + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(payload) + " + '\\n');process.exitCode=" + (value == "error" ? "1" : "0") + ";\n");
+            using (AgentWindow window = new AgentWindow(root, false)) {
+                Exception failure = null;
+                window.Shown += delegate { window.BeginInvoke(new Action(delegate {
+                    try { window.ValidateStartupFlowForTest(); }
+                    catch (Exception error) { failure = error; }
+                    finally { window.Close(); }
+                })); };
+                Application.Run(window);
+                if (failure != null) throw failure;
+            }
+            int expected = value == "false" || value == "error" ? 1 : 2;
+            NativeDesktopTests.Check(File.ReadAllText(Path.Combine(root, "prepare-count.txt")).Length == expected, "Unexpected runtime prepare count for " + value);
+            NativeDesktopTests.Check(File.Exists(marker) == (value != "error"), "Failed plugin recovery must not start the service.");
+            Console.WriteLine("Startup flow " + value + ": preparations=" + expected + ", service=" + File.Exists(marker));
+        }
+        Console.WriteLine("Startup flow passed: ordinary startup, update repair, legacy fallback, invalid protocol and fail-closed recovery. Only stub scripts ran.");
+    }
+
     internal static void ValidateLiveChrome(string root)
     {
         Exception failure = null;
@@ -159,6 +197,14 @@ internal static partial class MoE4All
 
     private sealed partial class AgentWindow
     {
+        internal void ValidateStartupFlowForTest()
+        {
+            startupWatch.Start();
+            var task = System.Threading.Tasks.Task.Run(new Action(RunAgent));
+            PumpUntil(delegate { return task.IsCompleted; }); task.GetAwaiter().GetResult();
+            Application.DoEvents();
+        }
+
         [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();

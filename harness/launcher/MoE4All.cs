@@ -71,6 +71,15 @@ internal static partial class MoE4All
             Add("专家已落地，正在唤醒 Agent", "The experts have landed. Waking up your Agent");
             Add("本地环境就绪，正在唤醒 Agent", "Local environment ready. Waking up your Agent");
             Add("正在启动桌面界面与本地服务。", "Starting the desktop interface and local services.");
+            Add("专家正在准备工作台", "Experts are preparing their desks");
+            Add("正在检查插件更新与恢复状态", "Checking plugin updates and recovery");
+            Add("正在核验插件切换记录；完成后启动本地服务。", "Checking plugin switch records before starting local services.");
+            Add("正在连接更新后的插件", "Connecting updated plugins");
+            Add("插件刚刚切换或恢复，正在修复本机运行时链接。", "Plugins were switched or restored. Repairing local runtime links.");
+            Add("正在启动 Agent 本地服务", "Starting the local Agent service");
+            Add("正在载入插件与工作区，界面就绪后自动进入。", "Loading plugins and your workspace. The interface opens when ready.");
+            Add("正在加载 Agent 界面", "Loading the Agent interface");
+            Add("本地服务已响应，正在加载界面资源。", "The local service is responding. Loading interface resources.");
             Add("启动遇到问题", "Startup needs attention"); Add("MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。", "MoE4All could not continue. The details below explain what happened. Resolve the issue and restart.");
             Add("需要处理后再继续", "Resolve the issue to continue"); Add("已停止", "Stopped");
             Add("MoE4All Agent 更新", "MoE4All Agent updates"); Add("Agent 更新", "Agent updates"); Add("已安装  ", "Installed  ");
@@ -867,6 +876,7 @@ internal static partial class MoE4All
         private readonly string installedVersion;
         private readonly ToolTip toolbarTip = new ToolTip();
         private Task browserInitialization;
+        private readonly Stopwatch startupWatch = new Stopwatch();
         private bool bootstrapLoaded;
         private bool bootstrapFailed;
         private bool desktopBridgeReady;
@@ -1097,7 +1107,11 @@ internal static partial class MoE4All
             ResizeEnd += delegate { SaveDesktopWindow(); };
             SizeChanged += delegate { TrackDesktopWindowState(); };
             SystemEvents.UserPreferenceChanged += OnSystemAppearanceChanged;
-            if (startAgentOnShown) Shown += async delegate { await InitializeBrowser(); if (!closing) StartAgent(); };
+            if (startAgentOnShown) Shown += async delegate {
+                startupWatch.Start();
+                StartAgent();
+                await InitializeBrowser();
+            };
             FormClosing += OnClosing;
         }
 
@@ -1216,6 +1230,7 @@ internal static partial class MoE4All
                     if (!value.TryGetValue("command", out command)) return;
                     if (command as string == "status")
                     {
+                        if (!desktopBridgeReady) RecordStartupTiming("interface-bridge-ready");
                         desktopBridgeReady = true;
                         ConfirmCapabilityHealth();
                         PublishDesktopState(desktopPhase == "available" && !desktopNotified);
@@ -1417,6 +1432,14 @@ internal static partial class MoE4All
             CompletePreparation();
             if (journey.ProgressValue != 100 || preparingProgress || progressBar.ProgressValue != 100)
                 throw new InvalidOperationException("Journey completion changed startup readiness semantics.");
+            if (ready || startupHeading.Text == Presentation.Translate("专家已经就位")
+                || progressText.Text != Presentation.Translate("正在检查插件更新与恢复状态"))
+                throw new InvalidOperationException("Runtime preparation must not claim the Agent is ready.");
+            foreach (string stage in new string[] { "正在连接更新后的插件", "正在启动 Agent 本地服务", "正在加载 Agent 界面" }) {
+                SetStartupStage(stage, "正在启动桌面界面与本地服务。");
+                if (progressText.Text != Presentation.Translate(stage) || ready || preparingProgress)
+                    throw new InvalidOperationException("Post-preparation stages must remain localized and indeterminate until ready.");
+            }
             if (name == "zh-green")
             {
                 journey.SetFrameForTest(100, 0, true);
@@ -1642,19 +1665,29 @@ internal static partial class MoE4All
 
         private void CompletePreparation()
         {
+            SetStartupStage("正在检查插件更新与恢复状态", "正在核验插件切换记录；完成后启动本地服务。");
+        }
+
+        private void RecordStartupTiming(string phase)
+        {
+            WriteMessage("[startup] " + phase + " elapsed_ms=" + startupWatch.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private void SetStartupStage(string stage, string detail)
+        {
             if (IsDisposed) return;
             if (InvokeRequired)
             {
-                try { BeginInvoke(new Action(CompletePreparation)); }
+                try { BeginInvoke(new Action<string, string>(SetStartupStage), stage, detail); }
                 catch (InvalidOperationException) { }
                 return;
             }
             preparingProgress = false;
             journey.SetProgress(100);
-            Presentation.SetCopy(startupHeading, "专家已经就位");
+            Presentation.SetCopy(startupHeading, "专家正在准备工作台");
             journey.AccessibleName = startupHeading.Text;
-            Presentation.SetCopy(progressText, firstLaunch ? "专家已落地，正在唤醒 Agent" : "本地环境就绪，正在唤醒 Agent");
-            Presentation.SetCopy(progressDetail, "正在启动桌面界面与本地服务。");
+            Presentation.SetCopy(progressText, stage);
+            Presentation.SetCopy(progressDetail, detail);
             Presentation.SetCopy(progressPercent, "启动中");
             progressBar.SetIndeterminate();
             PushStartupState();
@@ -1685,6 +1718,7 @@ internal static partial class MoE4All
                 job = CreateChildJob();
                 bridge = new DesktopBridge(this, Path.Combine(root, "models"));
                 bridge.Start();
+                RecordStartupTiming("runtime-prepare-start");
                 if (!Directory.Exists(profile)) WriteMessage("Preparing the bundled MoE4All Agent runtime.");
                 int prepared = RunScript(job, root, prepareScript,
                     " -InstallRoot " + Quote(root) + " -StateRoot " + Quote(state));
@@ -1694,11 +1728,19 @@ internal static partial class MoE4All
                     return;
                 }
 
+                RecordStartupTiming("runtime-prepared");
                 CompletePreparation();
                 if (RunCapabilities("apply", false) != 0) throw new InvalidOperationException("Plugin update recovery failed. See the startup log; installed plugins have not been started.");
+                RecordStartupTiming("plugin-recovery-checked");
                 // A cold switch may restore a profile from before relocation or an Agent upgrade.
-                if (RunScript(job, root, prepareScript, " -InstallRoot " + Quote(root) + " -StateRoot " + Quote(state)) != 0)
-                    throw new InvalidOperationException("Repairing plugin host links after the cold switch failed.");
+                if (capabilityProfileRepairRequired) {
+                    SetStartupStage("正在连接更新后的插件", "插件刚刚切换或恢复，正在修复本机运行时链接。");
+                    if (RunScript(job, root, prepareScript, " -InstallRoot " + Quote(root) + " -StateRoot " + Quote(state)) != 0)
+                        throw new InvalidOperationException("Repairing plugin host links after the cold switch failed.");
+                    RecordStartupTiming("plugin-links-repaired");
+                }
+                SetStartupStage("正在启动 Agent 本地服务", "正在载入插件与工作区，界面就绪后自动进入。");
+                RecordStartupTiming("local-service-start");
                 WriteMessage("MoE4All Agent is starting.");
                 Thread readiness = new Thread(WaitForReady);
                 readiness.IsBackground = true;
@@ -1742,6 +1784,9 @@ internal static partial class MoE4All
 
         private void OnAgentReady()
         {
+            if (closing) return;
+            RecordStartupTiming("local-service-ready");
+            SetStartupStage("正在加载 Agent 界面", "本地服务已响应，正在加载界面资源。");
             journey.Stop();
             ready = true;
             ActivateWebView();
@@ -1757,6 +1802,7 @@ internal static partial class MoE4All
         {
             try
             {
+                RecordStartupTiming("webview-start");
                 string userData = Path.Combine(root, "cache", "webview2");
                 Directory.CreateDirectory(userData);
                 CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(null, userData);
@@ -1765,6 +1811,7 @@ internal static partial class MoE4All
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
                 await InitializeDesktopChrome();
+                RecordStartupTiming("webview-ready");
                 webView.CoreWebView2.NewWindowRequested += delegate(object sender, CoreWebView2NewWindowRequestedEventArgs e) { e.Handled = true; OpenUrl(e.Uri); };
                 webView.CoreWebView2.NavigationStarting += delegate(object sender, CoreWebView2NavigationStartingEventArgs e)
                 {
@@ -1779,6 +1826,7 @@ internal static partial class MoE4All
                     Uri current;
                     if (!Uri.TryCreate(webView.CoreWebView2.Source, UriKind.Absolute, out current)
                         || current.Scheme != "http" || current.Host != "127.0.0.1" || current.Port != WebPort) return;
+                    RecordStartupTiming("interface-navigation-ready");
                     ShowAgentSurface();
                     PublishDesktopState(false);
                 };

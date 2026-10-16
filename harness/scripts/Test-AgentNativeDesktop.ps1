@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('picker','picker-light','chrome','chrome-live')][string]$Area = 'picker',
+    [ValidateSet('picker','picker-light','chrome','chrome-live','startup-flow')][string]$Area = 'picker',
     [switch]$Dialogs
 )
 $ErrorActionPreference = 'Stop'
@@ -41,11 +41,12 @@ $info.RedirectStandardError = $true
 $process = [Diagnostics.Process]::Start($info)
 $readOut = $process.StandardOutput.ReadToEndAsync()
 $readError = $process.StandardError.ReadToEndAsync()
-$timedOut = -not $process.WaitForExit(30000)
+$timeout = if ($Area -eq 'startup-flow') { 90000 } else { 30000 }
+$timedOut = -not $process.WaitForExit($timeout)
 if ($timedOut) { $process.Kill(); $process.WaitForExit() }
 [IO.File]::WriteAllText($stdout, $readOut.GetAwaiter().GetResult())
 [IO.File]::WriteAllText($stderr, $readError.GetAwaiter().GetResult())
 Get-Content -LiteralPath $stdout
 Get-Content -LiteralPath $stderr
-if ($timedOut) { throw 'Native desktop tests exceeded 30 seconds.' }
+if ($timedOut) { throw "Native desktop tests exceeded $timeout ms." }
 if ($process.ExitCode -ne 0) { throw 'Native desktop unit tests failed.' }

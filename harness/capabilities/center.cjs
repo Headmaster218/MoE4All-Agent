@@ -351,10 +351,12 @@ class CapabilityCenter {
   }
 
   async apply() {
+    this.profileRepairRequired = false;
     await this.requireCold();
     return this.lock(async () => {
       const transaction = await this.transaction();
       if (!transaction) return this.snapshot();
+      this.profileRepairRequired = ['ready', 'applying', 'awaiting-health', 'rollback-requested'].includes(transaction.phase);
       if (['applying', 'awaiting-health', 'rollback-requested'].includes(transaction.phase)) {
         if (transaction.phase === 'rollback-requested') assert.deepEqual(await identity(this.profile, this.catalog), transaction.after, 'Profile changed since update; refusing to overwrite user changes');
         const requested = transaction.phase === 'rollback-requested';

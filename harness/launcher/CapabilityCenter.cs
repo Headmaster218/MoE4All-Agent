@@ -32,6 +32,7 @@ internal static partial class MoE4All
     {
         private Dictionary<string, object> capabilityState;
         private volatile bool capabilityBusy;
+        private volatile bool capabilityProfileRepairRequired = true;
         private IntPtr capabilityJob;
         private bool capabilityHealthRequested, capabilityHealthConfirmed, capabilityStarted;
         private DateTime nextCapabilityCheck = DateTime.UtcNow.AddHours(6);
@@ -59,6 +60,7 @@ internal static partial class MoE4All
 
         private int RunCapabilities(string arguments, bool stream)
         {
+            if (arguments == "apply") capabilityProfileRepairRequired = true;
             string cli = Path.Combine(root, "harness/capabilities/cli.cjs");
             if (!File.Exists(cli)) throw new FileNotFoundException("The capability center is missing. Reinstall the complete Agent package.");
             ProcessStartInfo start = new ProcessStartInfo(FindBundledNode(root));
@@ -86,6 +88,9 @@ internal static partial class MoE4All
                         {
                             Dictionary<string, object> snapshot = new JavaScriptSerializer { MaxJsonLength = 2 * 1024 * 1024 }
                                 .Deserialize<Dictionary<string, object>>(e.Data.Substring(prefix.Length));
+                            object repair;
+                            if (arguments == "apply" && snapshot.TryGetValue("profileRepairRequired", out repair) && repair is bool)
+                                capabilityProfileRepairRequired = (bool)repair;
                             if (IsHandleCreated && !closing) BeginInvoke(new Action(delegate { capabilityState = snapshot; RefreshCapabilities(); }));
                         }
                         catch (Exception error) { WriteMessage("Capability status: " + error.Message, true); }

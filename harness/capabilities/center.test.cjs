@@ -146,6 +146,7 @@ test('prepared plugin is cold-switched only, then healthy rollback preserves use
   assert.equal(prepared.operation.phase, 'ready', prepared.operation.error);
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
   await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, true);
   assert.equal((await profile.identity(f.directory, catalog)).versions[item.id], '1.1.0');
   assert.equal((await profile.identity(f.directory, catalog)).versions[other.id], '1.0.0');
   const manifest = await profile.json(path.join(f.directory, 'package.json'));
@@ -162,9 +163,28 @@ test('prepared plugin is cold-switched only, then healthy rollback preserves use
   assert.equal(rollback.preparedVersion, '1.0.0');
   assert.equal(rollback.pendingAction, 'rollback');
   await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, true);
   assert.deepEqual({ ...(await f.center.snapshot()).plugins[0].lastUpdate, at: 0 }, { from: '1.1.0', to: '1.0.0', at: 0, kind: 'rollback' });
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
   assert.equal(await fs.readFile(path.join(f.directory, 'cordis.patch.yml'), 'utf8'), 'user-owned: untouched\n');
+});
+
+test('ordinary startup and terminal update journals do not request another runtime preparation', async () => {
+  const f = await fixture();
+  await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, false);
+  await publish(f); await f.center.check(true);
+  await f.center.prepare(item.id, '1.1.0', true);
+  await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, true);
+  await f.center.healthy();
+  await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, false, 'Applied journals must not retrigger preparation on every launch');
+  await publish(f, '1.2.0'); await f.center.check(true);
+  await f.center.prepare(item.id, '1.2.0', true);
+  await f.center.cancel();
+  await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, false);
 });
 
 test('old Engine Manager is an installation prerequisite, not an installation error', async () => {
@@ -207,11 +227,13 @@ test('unconfirmed startup and interruption at every rename restore the original 
     const before = await profile.identity(f.directory, catalog);
     await f.center.prepare(item.id, '1.1.0', true);
     assert.match((await f.center.apply()).operation.error, /simulated crash/);
+    assert.equal(f.center.profileRepairRequired, true);
     assert.deepEqual(await profile.identity(f.directory, catalog), before);
   }
   const f = await fixture(); await publish(f); await f.center.check(true);
   const before = await profile.identity(f.directory, catalog);
   await f.center.prepare(item.id, '1.1.0', true); await f.center.apply(); await f.center.apply();
+  assert.equal(f.center.profileRepairRequired, true, 'Unconfirmed activation requires repairing the restored profile');
   assert.deepEqual(await profile.identity(f.directory, catalog), before);
 });
 
