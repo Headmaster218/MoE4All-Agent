@@ -64,3 +64,12 @@ test('build and deploy both consume the explicit store; local defaults and Node 
   assert(build.includes('Node archive SHA256 does not match the pinned runtime.'))
   assert(release.includes('("--config.store-dir=$pnpmStore")'))
 })
+
+test('npm and Agent caches are sibling actions so each post-save hook runs', () => {
+  for (const name of ['ci.yml', 'release-windows.yml']) {
+    const workflow = readFileSync(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
+    assert(workflow.includes('      - uses: ./.github/actions/dependency-cache\n      - uses: ./.github/actions/agent-dependencies'))
+  }
+  const action = readFileSync(new URL('../.github/actions/agent-dependencies/action.yml', import.meta.url), 'utf8')
+  assert(!action.includes('uses: ./.github/actions/dependency-cache'))
+})

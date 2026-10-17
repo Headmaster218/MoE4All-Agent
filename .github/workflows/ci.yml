@@ -29,6 +29,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+      - uses: ./.github/actions/dependency-cache
       - uses: ./.github/actions/agent-dependencies
       - name: Verify CI cache, release policy and build switches
         env:

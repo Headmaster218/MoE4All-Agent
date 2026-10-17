@@ -37,6 +37,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ inputs.source_tag || github.ref }}
+      - uses: ./.github/actions/dependency-cache
       - uses: ./.github/actions/agent-dependencies
       - name: Validate main and release version
         id: version

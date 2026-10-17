@@ -1,9 +1,6 @@
 name: Agent frozen dependency caches
-description: Reuse repository-local npm policy; cache pnpm downloads and checksum-verified Node ZIP separately.
+description: Cache pnpm downloads and checksum-verified Node ZIP after the sibling npm cache action.
 outputs:
-  npm-hit:
-    value: ${{ steps.npm.outputs.cache-hit }}
-    description: Exact npm cache hit.
   pnpm-hit:
     value: ${{ steps.pnpm-write.outputs.cache-hit || steps.pnpm-read.outputs.cache-hit || 'false' }}
     description: Exact pnpm cache hit.
@@ -13,8 +10,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - id: npm
-      uses: ./.github/actions/dependency-cache
     - id: plan
       shell: bash
       run: node ci/agent-cache.mjs

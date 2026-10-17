@@ -50,6 +50,7 @@ Agent gitlink 与 profile lock 固定最新验收组合。为测试能力中心�
 及 profile lock；Node ZIP 单独按版本和固定 SHA256 建 key。
 可信 main push/手动任务成功后保存，PR/tag 只恢复；开发与发布使用同一套 key。
 缓存不可用时仍执行安装和原有测试，不以命中缓存代替正确性验证。
+两个缓存 composite action 在工作流中并列调用，避免多层嵌套时漏掉 npm 缓存的 post-save。
 构建器通过显式 `MOE4ALL_PNPM_STORE` 和 `MOE4ALL_NODE_ARCHIVE_ROOT` 复用对应下载目录，
 未指定时保留原有本地默认路径。npm 使用 `NPM_CONFIG_CACHE`。
 
