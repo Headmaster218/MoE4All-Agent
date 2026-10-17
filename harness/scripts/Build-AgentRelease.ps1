@@ -342,6 +342,10 @@ $node = Get-ChildItem -LiteralPath (Join-Path $buildHarness 'runtime') -Filter n
     Select-Object -First 1 -ExpandProperty FullName
 $pnpmCli = Join-Path $buildHarness 'runtime\pnpm\node_modules\pnpm\bin\pnpm.cjs'
 $pnpmStore = Join-Path $buildHarness 'runtime\pnpm-store'
+if ($env:MOE4ALL_PNPM_STORE) {
+    if (-not [IO.Path]::IsPathRooted($env:MOE4ALL_PNPM_STORE)) { throw 'MOE4ALL_PNPM_STORE must be absolute.' }
+    $pnpmStore = [IO.Path]::GetFullPath($env:MOE4ALL_PNPM_STORE)
+}
 if (-not $node -or -not (Test-Path -LiteralPath $pnpmCli -PathType Leaf)) { throw 'The release build runtime is incomplete.' }
 & (Join-Path $PSScriptRoot 'Prepare-CapabilityTools.ps1') -HarnessRoot $stageHarness -NodeExecutable $node
 & $node (Join-Path $PSScriptRoot 'Prepare-AgentDeploy.cjs') (Join-Path $buildHarness 'dsh')

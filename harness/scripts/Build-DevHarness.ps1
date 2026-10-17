@@ -27,6 +27,10 @@ $pnpmRoot = Join-Path $runtimeRoot 'pnpm'
 $pnpmCli = Join-Path $pnpmRoot 'node_modules\pnpm\bin\pnpm.cjs'
 $pnpmBin = Join-Path $pnpmRoot 'node_modules\.bin'
 $pnpmStore = Join-Path $runtimeRoot 'pnpm-store'
+if ($env:MOE4ALL_PNPM_STORE) {
+    if (-not [IO.Path]::IsPathRooted($env:MOE4ALL_PNPM_STORE)) { throw 'MOE4ALL_PNPM_STORE must be absolute.' }
+    $pnpmStore = [IO.Path]::GetFullPath($env:MOE4ALL_PNPM_STORE)
+}
 $pluginPackRoot = Join-Path $runtimeRoot 'plugin-packs'
 $devProfile = if ($ProfileDir) { [System.IO.Path]::GetFullPath($ProfileDir) } else { Join-Path $harnessRoot 'dev-state\home\profiles\web' }
 
@@ -43,6 +47,11 @@ if (-not $SkipInitialize) {
 
 New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
 $archive = Join-Path $runtimeRoot "$nodeFolder.zip"
+if ($env:MOE4ALL_NODE_ARCHIVE_ROOT) {
+    if (-not [IO.Path]::IsPathRooted($env:MOE4ALL_NODE_ARCHIVE_ROOT)) { throw 'MOE4ALL_NODE_ARCHIVE_ROOT must be absolute.' }
+    New-Item -ItemType Directory -Path $env:MOE4ALL_NODE_ARCHIVE_ROOT -Force | Out-Null
+    $archive = Join-Path $env:MOE4ALL_NODE_ARCHIVE_ROOT "$nodeFolder.zip"
+}
 if (-not (Test-Path -LiteralPath $archive)) {
     $uri = "https://nodejs.org/dist/v$NodeVersion/$nodeFolder.zip"
     Write-Host "Downloading $uri"

@@ -1,0 +1,41 @@
+name: Agent CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - name: Normalize source checkout
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: ./.github/actions/agent-dependencies
+      - name: Verify CI cache, release policy and build switches
+        env:
+          MOE4ALL_CI_TEST_ROOT: ${{ runner.temp }}
+        run: |
+          node --test ci/dependency-cache.test.mjs ci/release-mode.test.mjs ci/agent-cache.test.mjs ci/agent-release.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'CI policy tests failed.' }
+          ./harness/scripts/Test-AgentBuild.ps1
+      - name: Validate and prefetch frozen dependencies
+        run: ./ci/prepare-dependencies.ps1

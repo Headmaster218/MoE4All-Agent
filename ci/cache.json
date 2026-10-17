@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "npmVersion": "11.6.0",
+  "lockfiles": [
+    "harness/distribution/build-tools/package-lock.json",
+    "harness/distribution/update-tools/package-lock.json"
+  ]
+}

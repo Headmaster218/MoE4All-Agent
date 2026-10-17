@@ -1,0 +1,63 @@
+name: Agent frozen dependency caches
+description: Reuse repository-local npm policy; cache pnpm downloads and checksum-verified Node ZIP separately.
+outputs:
+  npm-hit:
+    value: ${{ steps.npm.outputs.cache-hit }}
+    description: Exact npm cache hit.
+  pnpm-hit:
+    value: ${{ steps.pnpm-write.outputs.cache-hit || steps.pnpm-read.outputs.cache-hit || 'false' }}
+    description: Exact pnpm cache hit.
+  node-hit:
+    value: ${{ steps.node-write.outputs.cache-hit || steps.node-read.outputs.cache-hit || 'false' }}
+    description: Exact Node archive cache hit.
+runs:
+  using: composite
+  steps:
+    - id: npm
+      uses: ./.github/actions/dependency-cache
+    - id: plan
+      shell: bash
+      run: node ci/agent-cache.mjs
+    - id: pnpm-write
+      if: steps.plan.outputs.save == 'true'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.plan.outputs.pnpmPath }}
+        key: ${{ steps.plan.outputs.pnpmKey }}
+        restore-keys: ${{ steps.plan.outputs.pnpmRestoreKey }}
+    - id: pnpm-read
+      if: steps.plan.outputs.save != 'true'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.plan.outputs.pnpmPath }}
+        key: ${{ steps.plan.outputs.pnpmKey }}
+        restore-keys: ${{ steps.plan.outputs.pnpmRestoreKey }}
+    - id: node-write
+      if: steps.plan.outputs.save == 'true'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.plan.outputs.nodePath }}
+        key: ${{ steps.plan.outputs.nodeKey }}
+    - id: node-read
+      if: steps.plan.outputs.save != 'true'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      continue-on-error: true
+      with:
+        path: ${{ steps.plan.outputs.nodePath }}
+        key: ${{ steps.plan.outputs.nodeKey }}
+    - name: Agent cache summary
+      shell: bash
+      env:
+        PNPM_HIT: ${{ steps.pnpm-write.outputs.cache-hit || steps.pnpm-read.outputs.cache-hit || 'false' }}
+        NODE_HIT: ${{ steps.node-write.outputs.cache-hit || steps.node-read.outputs.cache-hit || 'false' }}
+        CACHE_SAVE: ${{ steps.plan.outputs.save }}
+        PNPM_KEY: ${{ steps.plan.outputs.pnpmKey }}
+        NODE_KEY: ${{ steps.plan.outputs.nodeKey }}
+      run: |
+        echo "Agent cache: pnpm=$PNPM_HIT node=$NODE_HIT save=$CACHE_SAVE"
+        echo "Agent cache: pnpm=$PNPM_HIT node=$NODE_HIT save=$CACHE_SAVE" >> "$GITHUB_STEP_SUMMARY"
+        echo "pnpm key: $PNPM_KEY" >> "$GITHUB_STEP_SUMMARY"
+        echo "Node key: $NODE_KEY" >> "$GITHUB_STEP_SUMMARY"
