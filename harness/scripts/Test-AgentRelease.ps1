@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Archive,
     [string]$OutputDirectory,
+    [string]$QaToolsRoot,
     [switch]$Desktop
 )
 
@@ -21,6 +22,23 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $install = Join-Path $extract ([IO.Path]::GetFileNameWithoutExtension($zip))
 $report = @()
 $qa = Join-Path $output 'qa-tools'
+if ($QaToolsRoot) {
+    $qa = [IO.Path]::GetFullPath($QaToolsRoot)
+    $expectedLock = Join-Path $root 'harness\distribution\build-tools\package-lock.json'
+    $actualLock = Join-Path $qa 'package-lock.json'
+    if (-not (Test-Path -LiteralPath $actualLock -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $actualLock -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $expectedLock -Algorithm SHA256).Hash) {
+        throw 'Preinstalled QA tools do not match the fixed build-tools lock.'
+    }
+    $toolsManifest = Get-Content -LiteralPath (Join-Path $root 'harness\distribution\build-tools\package.json') -Raw | ConvertFrom-Json
+    foreach ($dependency in $toolsManifest.dependencies.PSObject.Properties) {
+        $installedManifest = Join-Path $qa ('node_modules\' + $dependency.Name + '\package.json')
+        if (-not (Test-Path -LiteralPath $installedManifest -PathType Leaf) -or
+            (Get-Content -LiteralPath $installedManifest -Raw | ConvertFrom-Json).version -ne $dependency.Value) {
+            throw "Preinstalled QA dependency differs from its fixed version: $($dependency.Name)"
+        }
+    }
+}
 foreach ($phase in @('fresh', 'relocated')) {
     if ($phase -eq 'relocated') {
         $target = Join-Path $output ('moved-' + [guid]::NewGuid().ToString('N'))
@@ -44,7 +62,7 @@ foreach ($phase in @('fresh', 'relocated')) {
             Start-Sleep -Seconds 1
         }
         $node = Join-Path $install 'node.exe'
-        if ($phase -eq 'fresh') {
+        if ($phase -eq 'fresh' -and -not $QaToolsRoot) {
             New-Item -ItemType Directory -Path $qa -Force | Out-Null
             foreach ($file in @('package.json', 'package-lock.json')) {
                 Copy-Item -LiteralPath (Join-Path $root "harness\distribution\build-tools\$file") -Destination (Join-Path $qa $file) -Force
