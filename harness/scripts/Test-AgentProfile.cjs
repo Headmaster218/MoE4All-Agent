@@ -11,7 +11,7 @@ const { c } = createRequire(path.join(realModules, 'dsh-llm-moe4all/package.json
 const names = Object.keys(JSON.parse(fs.readFileSync(path.join(root, 'harness/distribution/profile/package.json'), 'utf8')).dependencies);
 
 async function fixture() {
-  const output = path.join(root, 'artifacts/profile-provenance-tests');
+  const output = process.env.MOE4ALL_PROFILE_TEST_ROOT || path.join(root, 'artifacts/profile-provenance-tests');
   fs.mkdirSync(output, { recursive: true });
   const harness = fs.mkdtempSync(path.join(output, 'case-'));
   const profile = path.join(harness, 'agent-state/home/profiles/web');
@@ -49,6 +49,14 @@ async function fixture() {
   }));
   return { harness, profile, dependencies };
 }
+
+test('bundled profile versions match the pinned plugin source manifests', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'harness/distribution/profile/package.json'), 'utf8'));
+  for (const [name, version] of Object.entries(manifest.dependencies)) {
+    const source = JSON.parse(fs.readFileSync(path.join(root, 'harness/plugins', name, 'package.json'), 'utf8'));
+    assert.equal(version, source.version, `${name} profile version drifted from its pinned source`);
+  }
+});
 
 test('checks every published file in all eight bundled plugin archives', async () => {
   const f = await fixture();
