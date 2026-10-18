@@ -1,6 +1,6 @@
 import React, { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
-import { CapabilitiesSection, CapabilitiesDialog } from '/@dsh/packages/client/ui-settings-general/src/client/Capabilities.tsx'
+import { CapabilitiesSection, CapabilitiesNotification } from '/@dsh/packages/client/ui-settings-general/src/client/Capabilities.tsx'
 import { DesktopController } from '/@dsh/packages/client/ui-settings-general/src/client/desktop-controller.ts'
 import { SettingsRoot } from '/@dsh/packages/client/ui-settings-general/src/client/SettingsRoot.tsx'
 import { en, zh } from '/@dsh/packages/client/ui-settings-general/src/client/locales.ts'
@@ -29,12 +29,12 @@ const plugins = [
   releaseUrl: `https://github.com/Headmaster218/${id}/releases` }))
 const snapshot = { schema: 'moe4all/capabilities/v1', settings: { autoCheck: true, preview: true, skipped: {} }, plugins, pending: false, checking: false,
   engine: { canInstall: true, installed: { tag: 'release-1.0.0' }, latest: { tag: 'release-1.0.1' }, runtime: { owned: false }, updateAvailable: true, phase: 'idle' } }
-const rows = [{ id: 'plugins', order: 15, label: language === 'zh' ? '插件' : 'Plugins' }, { id: 'capabilities', order: 17, label: t('cap.title') }, { id: 'moe4all', order: 20, label: 'MoE4All' }]
+const rows = [{ id: 'plugins', order: 15, label: language === 'zh' ? '插件' : 'Plugins' }, { id: 'moe4all', order: 16, label: 'MoE4All' }, { id: 'capabilities', order: 17, label: t('cap.title') }]
 createRoot(document.getElementById('root')!).render(<>
   <h1 style={{ fontSize: 18, fontWeight: 500 }}>MoE4All Agent</h1>
   <div style={{ width: 170 }}><SettingsRoot wide useSections={selector => selector(rows)} useOnboardingSteps={selector => selector([])} useSessions={selector => selector({ phase: 'ready', current: 'qa', byId: { qa: { blank: false } } })}
-    renderSlot={(slot, _, options) => slot === 'settings.trigger' ? <>{t('trigger')}</> : slot === 'settings.header' ? t('title') : slot === 'settings.close' ? t('close')
-      : slot === 'settings.notification' ? <CapabilitiesDialog {...props} /> : slot === 'settings.section' ? options?.only === 'capabilities' ? <CapabilitiesSection {...props} /> : <h2>{rows.find(row => row.id === options?.only)?.label}</h2> : null} /></div>
+    renderSlot={(slot, owner, options) => slot === 'settings.trigger' ? <>{t('trigger')}</> : slot === 'settings.header' ? t('title') : slot === 'settings.close' ? t('close')
+      : slot === 'settings.notification' ? <CapabilitiesNotification {...props} {...owner} /> : slot === 'settings.section' ? options?.only === 'capabilities' ? <CapabilitiesSection {...props} /> : <h2>{rows.find(row => row.id === options?.only)?.label}</h2> : null} /></div>
 </>)
 Object.assign(window, { capabilityQa: { emit, controller, messages, snapshot } })
 setTimeout(() => {

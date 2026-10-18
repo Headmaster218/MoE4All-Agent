@@ -42,7 +42,7 @@ try {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`http://127.0.0.1:${port}/?lang=${lang}&theme=${theme}`)
     const title = lang === 'zh' ? '能力中心' : 'Capabilities'
-    await page.getByRole('dialog', { name: title, exact: true }).waitFor()
+    await page.getByRole('heading', { name: title, exact: true }).waitFor()
     const report = await page.evaluate(() => {
       const failures = []
       const rgb = text => { const values = text.match(/[\d.]+/g)?.map(Number) ?? [0, 0, 0, 0]; return [...values.slice(0, 3).map(value => text.startsWith('color(srgb ') ? value * 255 : value), values[3] ?? 1] }
@@ -74,7 +74,7 @@ try {
     await page.getByRole('button', { name: lang === 'zh' ? '关闭' : 'Close', exact: true }).click()
     await page.getByRole('button', { name: lang === 'zh' ? '设置' : 'Settings', exact: true }).click()
     const labels = await page.locator('nav button').allTextContents()
-    assert.deepEqual(labels, [lang === 'zh' ? '插件' : 'Plugins', title, 'MoE4All'])
+    assert.deepEqual(labels, [lang === 'zh' ? '插件' : 'Plugins', 'MoE4All', title])
     await page.getByRole('button', { name: title, exact: true }).click()
     await page.getByRole('heading', { name: title }).waitFor()
     if (width === 1280) await page.screenshot({ path: path.join(evidence, `${lang}-${theme}-settings.png`) })
