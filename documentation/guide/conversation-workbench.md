@@ -7,7 +7,7 @@ last_verified: 2026-10-19
 
 # 会话导航与文件工作台
 
-本页记录本轮 Agent 本地源码能力，不代表已经打包、发布或完成整包验收。DSH 仍固定在当前分支，未整体升级上游；手机、EasyRewrite 等维护插件与独立 Engine 均未修改。原 1–24 项的取舍见[功能选择清单](../roadmap/dsh-feature-selection.md)。
+本页记录 Agent 本地源码能力，不代表已经发布。DSH 仍固定在当前分支，未整体升级上游；手机、EasyRewrite 等维护插件与独立 Engine 均未修改。原 1–24 项的取舍见[功能选择清单](../roadmap/dsh-feature-selection.md)，本地编译与真实 35B 验收见[验证记录](../evidence/changes/product/2026-10-19-agent-validation.md)。
 
 ## 问题目录
 
@@ -57,6 +57,6 @@ HTML/PPTX 放在不含 `allow-same-origin` 的 sandbox iframe 中，CSP 禁止�
 
 ## 验证边界
 
-本轮使用相关包单元测试、现有 slot 组装测试、分 Host/Client 的改动文件语义检查，以及独立组件浏览器检查。实际检查了桌面/手机宽度、暗/亮色、HTML 交互和宿主隔离、真实最小 PPTX 转换。没有完整编译 Agent、重打包、发布、启动推理后端或操作生产 DSH。
+2026-10-19 已完成 Host、Client 与 Web 完整编译，并在隔离实例连接现成本地 35B，实际操作对话、停止后续聊、文件上传/引用、工具写文件、修改记录、问题目录、HTML/PPTX 与 Git。也验证了中英两种语言、四种配色，以及通用 API 思考配置的界面保存。整包冷启动、目录移位与 OTA 的具体口径以验证记录为准；未发布，未操作生产 DSH。
 
 客户端目录依赖门禁当前报告 27 项；使用修改前 `61d6e3c` 的内容重放得到同样 27 项，本轮没有新增，不将它报告为整体门禁已通过。组件检查不能代替最终 EXE、真实复杂 Office 文件及生产会话验收。
