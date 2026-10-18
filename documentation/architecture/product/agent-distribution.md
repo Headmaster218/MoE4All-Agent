@@ -23,6 +23,8 @@ MoE4All 品牌 DSH + 独立 DSH_HOME / workspace / port
 
 内部 `@deepseek-ai/dsh-*`、`DSH_HOME` 等兼容名保留以复用插件生态；保留变量名不等于共享变量值。连接已有引擎不获得该进程的生命周期所有权，不能把“连接”变成重启/停止生产后端。
 
+2026-10-19 的选择性功能接入仍使用这一结构：问题目录与文件工作台在现有 conversation slot/store 内组装，文件与只读 Git RPC 由现有 API gateway 按会话工作区授权，不创建第二套 Agent、文件服务或模型执行器。HTML/PPTX 在不共享 origin 的 sandbox 内展示，不能调用宿主工具；思考能力编辑沿用现有 pi-ai 模型配置。使用范围与验证限制见[工作台说明](../../guide/conversation-workbench.md)，全部取舍见[1–24 项清单](../../roadmap/dsh-feature-selection.md)。
+
 ## `release-0.1.0-preview.3` 中的固定组合
 
 下表记录发布 tag 的组合。根 `.gitmodules` 全部指向 Headmaster218 维护仓库；gitlink 是版本事实，不以本机子模块工作树替代。

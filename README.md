@@ -10,6 +10,8 @@ MoE4All Agent 是 MoE4All 的桌面 Agent 发行版，包含桌面壳、DSH、�
 
 桌面支持中文和 English，以及森林绿、黑色、灰色、白色四种配色。设置持久化与插件适配说明见[语言与配色](documentation/guide/agent-appearance.md)。
 
+当前源码的[问题目录与文件工作台](documentation/guide/conversation-workbench.md)包含本地文件输入、HTML/PPTX 基础预览、按轮次 diff 与只读 Git graph。与新版 DSH 的[1–24 项功能取舍](documentation/roadmap/dsh-feature-selection.md)区分已实现、基础子集和待定项目。
+
 Windows 正式版在[Agent Releases](https://github.com/Headmaster218/MoE4All-Agent/releases)发布。
 解压后运行 `MoE4All.exe`，无需构建。Engine 与模型独立导入或安装。
 标签触发的 CI 和固定依赖见[构建与发布](documentation/guide/agent-release.md)。
