@@ -181,10 +181,11 @@ internal static partial class MoE4All
             int y = Math.Max(1, browserButton.Height / 2);
             if (webView.Region.IsVisible(ClientSize.Width - 20, y))
                 throw new InvalidOperationException("Web content must not cover native window controls.");
-            foreach (int offset in new int[] { 23, 69, 115 }) {
+            for (int index = 0; index < 3; index++) {
+                int offset = caption.Width * (2 * index + 1) / 6;
                 Point point = PointToScreen(new Point(caption.Right - offset, y));
                 int hit = SendMessage(Handle, 0x84, IntPtr.Zero, new IntPtr((point.Y << 16) | (point.X & 0xffff))).ToInt32();
-                int expected = offset == 23 ? 20 : offset == 69 ? 9 : 8;
+                int expected = index == 0 ? 20 : index == 1 ? 9 : 8;
                 if (hit != expected) throw new InvalidOperationException("Native caption hit test failed: " + hit + " vs " + expected);
             }
             Rectangle restored = Bounds;

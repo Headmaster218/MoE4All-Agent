@@ -275,7 +275,9 @@ internal static partial class MoE4All
             NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Blank WebView top area must drag the native window.");
             before = Bounds;
             Console.WriteLine("Live button geometry: dpi=" + DeviceDpi + ", zoom=" + webView.ZoomFactor + ", " + Pump(webView.CoreWebView2.ExecuteScriptAsync("JSON.stringify({rect:document.getElementById('action').getBoundingClientRect().toJSON(),region:getComputedStyle(document.getElementById('action')).webkitAppRegion})")));
-            MovePointer(new Point(205, 18), false);
+            int buttonX = int.Parse(Pump(webView.CoreWebView2.ExecuteScriptAsync("Math.round((document.getElementById('action').getBoundingClientRect().left + document.getElementById('action').getBoundingClientRect().width / 2) * devicePixelRatio)")), System.Globalization.CultureInfo.InvariantCulture);
+            int buttonY = int.Parse(Pump(webView.CoreWebView2.ExecuteScriptAsync("Math.round((document.getElementById('action').getBoundingClientRect().top + document.getElementById('action').getBoundingClientRect().height / 2) * devicePixelRatio)")), System.Globalization.CultureInfo.InvariantCulture);
+            MovePointer(new Point(webView.Left + buttonX, webView.Top + buttonY), false);
             System.Threading.Thread.Sleep(150); Application.DoEvents();
             NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("window.clicks")) == "1", "Top-row interactive controls must receive clicks.");
             NativeDesktopTests.Check(Bounds == before, "Clicking a top-row control must not move the window.");
