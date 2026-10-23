@@ -1,5 +1,14 @@
 # Portable Agent defaults. User models, network addresses, and credentials are not bundled.
 
+- id: web-runtime
+  inject: [webStartup]
+  config:
+    openBrowser: !!js ctx.webStartup.openBrowser
+    printUrl: true
+    surfaceContext: true
+    developmentContext: false
+    trustedHosts: !!js ctx.webStartup.trustedHosts
+
 - id: web
   config:
     searchProvider: brave-search
