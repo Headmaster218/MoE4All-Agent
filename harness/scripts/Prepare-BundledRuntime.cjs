@@ -348,7 +348,9 @@ function prepareProfile(install, previousInstall, harness, state, dsh) {
   if (!exists(patchPath)) return;
   console.log('Applying portable Agent profile paths.');
   const yaml = requireDsh('js-yaml');
-  const patch = yaml.load(fs.readFileSync(native(patchPath), 'utf8'));
+  // Use the Loader's inert expression nodes; preparation never evaluates !!js.
+  const { entryListSchema: schema } = requireDsh('@deepseek-ai/cordis-plugin-include');
+  const patch = yaml.load(fs.readFileSync(native(patchPath), 'utf8'), { schema });
   let changed = false;
   const models = path.join(install, 'models');
   const cache = path.join(install, 'cache', 'kv-sessions');
@@ -401,7 +403,7 @@ function prepareProfile(install, previousInstall, harness, state, dsh) {
       }
     }
   }
-  if (changed) write(patchPath, yaml.dump(patch, { lineWidth: -1 }));
+  if (changed) write(patchPath, yaml.dump(patch, { schema, lineWidth: -1 }));
 }
 
 async function prepareEngine(harness, state) {
@@ -484,4 +486,4 @@ if (require.main === module) {
   if (!install || !state) { console.error('InstallRoot and StateRoot are required.'); process.exitCode = 1; }
   else prepare(install, state).catch((error) => { console.error(error.stack); process.exitCode = 1; });
 }
-module.exports = { contained, copyTree, unpack, ensureJunction, restoreLinks, remapManagedPath, prepare };
+module.exports = { contained, copyTree, unpack, ensureJunction, restoreLinks, remapManagedPath, prepareProfile, prepare };
