@@ -11,8 +11,9 @@
       style.id = 'moe4all-native-chrome'
       style.textContent = `
         [data-moe4all-drag] { app-region: drag; -webkit-app-region: drag; }
-        button, a, input, select, textarea, [role=button], [role=tab], [role=checkbox],
-        [role=switch], [role=slider], [role=combobox], [contenteditable],
+        /* Keep body controls out of native caption calculations, including dynamic question buttons. */
+        [data-moe4all-drag] :is(button, a, input, select, textarea, [role=button], [role=tab], [role=checkbox],
+        [role=switch], [role=slider], [role=combobox], [contenteditable]),
         [data-moe4all-no-drag], [role=dialog], dialog, [popover] {
           app-region: no-drag !important; -webkit-app-region: no-drag !important;
         }

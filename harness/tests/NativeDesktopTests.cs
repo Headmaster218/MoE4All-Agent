@@ -21,6 +21,7 @@ internal static class NativeDesktopTests
             if (area == "picker") Picker(args.Length > 1 && args[1] == "--dialogs");
             else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
             else if (area == "chrome-live") MoE4All.ValidateLiveChrome(Environment.CurrentDirectory);
+            else if (area == "chrome-regions") MoE4All.ValidateLiveChrome(Environment.CurrentDirectory, false);
             else if (area == "startup-flow") MoE4All.ValidateStartupFlow(Environment.CurrentDirectory);
             else if (area == "desktop-failure") MoE4All.ValidateDesktopFailure(Environment.CurrentDirectory);
             else if (area == "picker-light") ProbeDialog("white", "directory");
@@ -188,12 +189,12 @@ internal static partial class MoE4All
         Console.WriteLine("Startup flow passed: ordinary startup, update repair, legacy fallback, invalid protocol and fail-closed recovery. Only stub scripts ran.");
     }
 
-    internal static void ValidateLiveChrome(string root)
+    internal static void ValidateLiveChrome(string root, bool mouse = true)
     {
         Exception failure = null;
         using (AgentWindow window = new AgentWindow(root, false)) {
             window.Shown += delegate { window.BeginInvoke(new Action(delegate {
-                try { window.ValidateLiveChromeForTest(); }
+                try { window.ValidateLiveChromeForTest(mouse); }
                 catch (Exception error) { failure = error; }
                 finally { window.Close(); }
             })); };
@@ -285,14 +286,16 @@ internal static partial class MoE4All
             Application.DoEvents();
         }
 
-        internal void ValidateLiveChromeForTest()
+        internal void ValidateLiveChromeForTest(bool mouse = true)
         {
             Show(); WindowState = FormWindowState.Normal;
             Bounds = new Rectangle(100, 100, 1100, 800);
             Application.DoEvents(); LayoutDesktopChrome();
             Rectangle before = Bounds;
-            MovePointer(new Point(400, 18), true);
-            NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Native startup surface must drag the window.");
+            if (mouse) {
+                MovePointer(new Point(400, 18), true);
+                NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Native startup surface must drag the window.");
+            }
             var environment = Pump(Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(null,
                 Path.Combine(root, "webview-fixture"), new Microsoft.Web.WebView2.Core.CoreWebView2EnvironmentOptions("--disable-gpu")));
             var initialize = webView.EnsureCoreWebView2Async(environment);
@@ -301,10 +304,32 @@ internal static partial class MoE4All
             PumpUntil(delegate { return chrome.IsCompleted; }); chrome.GetAwaiter().GetResult();
             bool navigated = false;
             webView.CoreWebView2.NavigationCompleted += delegate { navigated = true; };
-            webView.CoreWebView2.NavigateToString("<!doctype html><html><head></head><body style='background:#303530;color:white;margin:0'><button id='action' style='position:absolute;left:180px;top:8px' onclick='window.clicks++'>Action</button><script>window.clicks=0</script><p style='margin-top:60px'>Isolated chrome fixture; no Agent or backend service.</p></body></html>");
+            webView.CoreWebView2.NavigateToString("<!doctype html><html><head></head><body style='background:#303530;color:white;margin:0'><header data-moe4all-drag style='height:36px'><button id='action' style='position:absolute;left:180px;top:8px' onclick='window.clicks++'>Action</button></header><script>window.clicks=0</script><p style='margin-top:60px'>Isolated chrome fixture; no Agent or backend service.</p></body></html>");
             PumpUntil(delegate { return navigated; });
             startup.Visible = false; webView.Visible = true; webView.BringToFront(); LayoutDesktopChrome();
             NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("!!document.getElementById('moe4all-native-drag-region')")) == "true", "Document-created script must install its drag surface.");
+            NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync(@"(() => {
+                const header = document.createElement('header'); header.dataset.moe4allDrag = '';
+                header.style.cssText = 'position:absolute;left:600px;top:4px';
+                header.innerHTML = '<input id=header-input><textarea id=header-answer></textarea>';
+                document.body.append(header);
+                const main = document.createElement('main'); main.style.marginTop = '160px';
+                main.innerHTML = '<textarea id=body-answer></textarea><button id=body-action>Answer</button><button id=explicit-action data-moe4all-no-drag>Explicit opt-out</button><div role=dialog><textarea id=dialog-answer></textarea></div>';
+                document.body.append(main);
+                return getComputedStyle(document.getElementById('body-answer')).webkitAppRegion === 'none'
+                    && getComputedStyle(document.getElementById('body-action')).webkitAppRegion === 'none'
+                    && getComputedStyle(document.getElementById('explicit-action')).webkitAppRegion === 'no-drag'
+                    && getComputedStyle(document.getElementById('header-input')).webkitAppRegion === 'no-drag'
+                    && getComputedStyle(document.getElementById('header-answer')).webkitAppRegion === 'no-drag'
+                    && getComputedStyle(document.getElementById('action')).webkitAppRegion === 'no-drag';
+            })()")) == "true", "Only header inputs may participate in non-client hit testing; body fields must keep the browser default.");
+            foreach (string id in new[] { "body-answer", "dialog-answer" }) {
+                NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("(() => { const field=document.getElementById('" + id + "'); field.focus(); field.value='Dynamic question answer'; field.setSelectionRange(0,field.value.length); return document.activeElement === field; })()")) == "true", "Dynamic body and dialog fields must remain focusable.");
+            }
+            if (!mouse) {
+                Console.WriteLine("Chrome regions passed: real WebView CSS defaults, header controls, explicit opt-outs and dynamic body/dialog answers; no global mouse input.");
+                Close(); return;
+            }
             before = Bounds;
             MovePointer(new Point(400, 18), true);
             NativeDesktopTests.Check(Left >= before.Left + 30 && Top >= before.Top + 15, "Blank WebView top area must drag the native window.");
@@ -316,7 +341,7 @@ internal static partial class MoE4All
             System.Threading.Thread.Sleep(150); Application.DoEvents();
             NativeDesktopTests.Check(Pump(webView.CoreWebView2.ExecuteScriptAsync("window.clicks")) == "1", "Top-row interactive controls must receive clicks.");
             NativeDesktopTests.Check(Bounds == before, "Clicking a top-row control must not move the window.");
-            Console.WriteLine("Live chrome passed: actual startup and WebView dragging, document-created installation, clickable top-row button. No Agent/backend started.");
+            Console.WriteLine("Live chrome passed: actual startup and WebView dragging, document-created installation, clickable top-row button, scoped input regions and dynamic body/dialog answers. No Agent/backend started.");
             Close();
         }
     }
