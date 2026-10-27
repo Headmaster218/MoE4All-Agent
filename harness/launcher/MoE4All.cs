@@ -81,6 +81,9 @@ internal static partial class MoE4All
             Add("正在加载 Agent 界面", "Loading the Agent interface");
             Add("本地服务已响应，正在加载界面资源。", "The local service is responding. Loading interface resources.");
             Add("启动遇到问题", "Startup needs attention"); Add("MoE4All 没有继续运行。具体原因已展开在下方，修正后重新启动即可。", "MoE4All could not continue. The details below explain what happened. Resolve the issue and restart.");
+            Add("桌面界面暂不可用", "Desktop view unavailable");
+            Add("本地服务可能仍在运行。可以在浏览器继续使用，或查看日志后重新打开 Agent。", "The local service may still be running. Continue in your browser, or check the log and reopen Agent.");
+            Add("请在浏览器继续或查看日志", "Continue in your browser or check the log");
             Add("需要处理后再继续", "Resolve the issue to continue"); Add("已停止", "Stopped");
             Add("MoE4All Agent 更新", "MoE4All Agent updates"); Add("Agent 更新", "Agent updates"); Add("已安装  ", "Installed  ");
             Add("可以检查更新", "Ready to check"); Add("检查 GitHub 上是否有更新的 MoE4All Agent。", "Check GitHub for a newer MoE4All Agent package.");
@@ -564,7 +567,7 @@ internal static partial class MoE4All
                 animationOffset = (animationOffset + Math.Max(4, Width / 100)) % Math.Max(1, Width + Math.Max(48, Width / 4));
                 Invalidate();
             };
-            animation.Start();
+            UpdateAnimation();
         }
 
         public int ProgressValue { get { return progress / 10; } }
@@ -574,6 +577,7 @@ internal static partial class MoE4All
             progress = Math.Max(0, Math.Min(1000, value));
             indeterminate = false;
             failed = false;
+            UpdateAnimation();
             Invalidate();
         }
 
@@ -582,6 +586,7 @@ internal static partial class MoE4All
             indeterminate = true;
             failed = false;
             animationOffset = 0;
+            UpdateAnimation();
             Invalidate();
         }
 
@@ -589,8 +594,22 @@ internal static partial class MoE4All
         {
             indeterminate = false;
             failed = true;
+            UpdateAnimation();
             Invalidate();
         }
+
+        private void UpdateAnimation()
+        {
+            if (animation != null) animation.Enabled = Visible && indeterminate && !failed;
+        }
+
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            UpdateAnimation();
+        }
+
+        public bool IsAnimating { get { return animation.Enabled; } }
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -880,6 +899,9 @@ internal static partial class MoE4All
         private bool bootstrapLoaded;
         private bool bootstrapFailed;
         private bool desktopBridgeReady;
+        private bool desktopNavigationReady, desktopViewReady, desktopSurfaceShown;
+        private System.Windows.Forms.Timer desktopLoadTimer;
+        private ulong desktopNavigationId;
         private bool desktopNotified;
         private string desktopPhase = "idle";
         private string desktopMessage = "";
@@ -1232,8 +1254,11 @@ internal static partial class MoE4All
                     {
                         if (!desktopBridgeReady) RecordStartupTiming("interface-bridge-ready");
                         desktopBridgeReady = true;
-                        ConfirmCapabilityHealth();
                         PublishDesktopState(desktopPhase == "available" && !desktopNotified);
+                    }
+                    if (command as string == "view-ready") {
+                        desktopViewReady = true;
+                        TryShowAgentSurface();
                     }
                     if (command as string == "check") StartUpdateAction("Check", true);
                     if (command as string == "install" && !string.IsNullOrEmpty(availableUpdate))
@@ -1349,7 +1374,7 @@ internal static partial class MoE4All
             if (percent < 70) return "专家正在飞往工作区";
             if (percent < 80) return "专家正在降落";
             if (percent < 98) return "专家正在走向工作区";
-            return "专家已经就位";
+            return "专家正在准备工作台";
         }
 
         private string PreparationStage(int percent)
@@ -1412,10 +1437,11 @@ internal static partial class MoE4All
             foreach (int percent in new int[] { 0, 10, 24, 25, 29, 30, 44, 45, 50, 69, 70, 79, 80, 97, 98, 100 })
             {
                 UpdatePreparationProgress(percent, 100, "unpacking bundled runtime");
-                if (journey.ProgressValue != percent || progressBar.ProgressValue != percent
-                    || startupHeading.Text != Presentation.Translate(PreparationHeading(percent)))
+                int expectedProgress = percent * 80 / 100;
+                if (journey.ProgressValue != expectedProgress || progressBar.ProgressValue != expectedProgress || progressBar.IsAnimating
+                    || startupHeading.Text != Presentation.Translate(PreparationHeading(expectedProgress)))
                     throw new InvalidOperationException("Journey is not synchronized to preparation progress.");
-                journey.SetFrameForTest(percent, 0, true);
+                journey.SetFrameForTest(expectedProgress, 0, true);
                 using (Bitmap bitmap = new Bitmap(journey.Width, journey.Height))
                 {
                     journey.DrawToBitmap(bitmap, journey.ClientRectangle);
@@ -1430,7 +1456,7 @@ internal static partial class MoE4All
             if (stillA != stillB || movingA == movingB)
                 throw new InvalidOperationException("Journey motion or reduced-motion rendering failed.");
             CompletePreparation();
-            if (journey.ProgressValue != 100 || preparingProgress || progressBar.ProgressValue != 100)
+            if (journey.ProgressValue != 80 || preparingProgress || progressBar.ProgressValue != 80)
                 throw new InvalidOperationException("Journey completion changed startup readiness semantics.");
             if (ready || startupHeading.Text == Presentation.Translate("专家已经就位")
                 || progressText.Text != Presentation.Translate("正在检查插件更新与恢复状态"))
@@ -1440,6 +1466,10 @@ internal static partial class MoE4All
                 if (progressText.Text != Presentation.Translate(stage) || ready || preparingProgress)
                     throw new InvalidOperationException("Post-preparation stages must remain localized and indeterminate until ready.");
             }
+            CompleteStartup();
+            if (journey.ProgressValue != 100 || progressBar.ProgressValue != 100
+                || progressBar.IsAnimating || startupHeading.Text != Presentation.Translate("专家已经就位"))
+                throw new InvalidOperationException("Only the interface handshake may finish overall startup progress.");
             if (name == "zh-green")
             {
                 journey.SetFrameForTest(100, 0, true);
@@ -1651,7 +1681,8 @@ internal static partial class MoE4All
                 return;
             }
             preparingProgress = true;
-            int value = total <= 0 ? 0 : (int)Math.Max(0, Math.Min(1000, completed * 1000 / total));
+            // Runtime preparation is only the first phase; the interface handshake owns completion.
+            int value = total <= 0 ? 0 : (int)Math.Max(0, Math.Min(800, (double)completed / total * 800));
             int percent = value / 10;
             progressBar.SetProgress(value);
             journey.SetProgress(percent);
@@ -1666,6 +1697,17 @@ internal static partial class MoE4All
         private void CompletePreparation()
         {
             SetStartupStage("正在检查插件更新与恢复状态", "正在核验插件切换记录；完成后启动本地服务。");
+        }
+
+        private void CompleteStartup()
+        {
+            preparingProgress = false;
+            progressBar.SetProgress(1000);
+            journey.SetProgress(100);
+            journey.Stop();
+            Presentation.SetCopy(startupHeading, "专家已经就位");
+            journey.AccessibleName = startupHeading.Text;
+            Presentation.SetCopy(progressPercent, "100%");
         }
 
         private void RecordStartupTiming(string phase)
@@ -1683,7 +1725,7 @@ internal static partial class MoE4All
                 return;
             }
             preparingProgress = false;
-            journey.SetProgress(100);
+            journey.SetProgress(80);
             Presentation.SetCopy(startupHeading, "专家正在准备工作台");
             journey.AccessibleName = startupHeading.Text;
             Presentation.SetCopy(progressText, stage);
@@ -1819,16 +1861,37 @@ internal static partial class MoE4All
                     if (Uri.TryCreate(e.Uri, UriKind.Absolute, out uri) && e.Uri != "about:blank"
                         && !(uri.Scheme == "http" && uri.Host == "127.0.0.1" && uri.Port == WebPort))
                     { e.Cancel = true; if (uri.Scheme == "https" || uri.Scheme == "http") OpenUrl(e.Uri); }
+                    else if (Uri.TryCreate(e.Uri, UriKind.Absolute, out uri) && uri.Scheme == "http"
+                        && uri.Host == "127.0.0.1" && uri.Port == WebPort) {
+                        desktopNavigationId = e.NavigationId;
+                        desktopNavigationReady = desktopViewReady = desktopSurfaceShown = false;
+                        desktopBridgeReady = false;
+                        StartDesktopLoadTimer();
+                    }
                 };
                 webView.CoreWebView2.NavigationCompleted += delegate(object sender, CoreWebView2NavigationCompletedEventArgs e)
                 {
-                    if (!ready || !e.IsSuccess) return;
+                    if (closing || !ready || e.NavigationId != desktopNavigationId) return;
+                    if (!e.IsSuccess) {
+                        if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
+                            FailDesktopView("WebView2 navigation: " + e.WebErrorStatus);
+                        return;
+                    }
                     Uri current;
                     if (!Uri.TryCreate(webView.CoreWebView2.Source, UriKind.Absolute, out current)
                         || current.Scheme != "http" || current.Host != "127.0.0.1" || current.Port != WebPort) return;
                     RecordStartupTiming("interface-navigation-ready");
-                    ShowAgentSurface();
-                    PublishDesktopState(false);
+                    desktopNavigationReady = true;
+                    TryShowAgentSurface();
+                };
+                webView.CoreWebView2.ProcessFailed += delegate(object sender, CoreWebView2ProcessFailedEventArgs e)
+                {
+                    if (closing) return;
+                    WriteMessage("WebView2 process: " + e.ProcessFailedKind, true);
+                    if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited
+                        || e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessExited
+                        || e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessUnresponsive)
+                        FailDesktopView("WebView2 process: " + e.ProcessFailedKind);
                 };
                 ShowBootstrap();
             }
@@ -1850,10 +1913,34 @@ internal static partial class MoE4All
             if (closing || webView.CoreWebView2 == null) return;
             bootstrapLoaded = false;
             desktopBridgeReady = false;
+            desktopNavigationReady = desktopViewReady = desktopSurfaceShown = false;
+            StartDesktopLoadTimer();
             webView.Source = new Uri("http://127.0.0.1:" + WebPort + "/");
+        }
+        private void StartDesktopLoadTimer()
+        {
+            if (desktopLoadTimer == null) {
+                desktopLoadTimer = new System.Windows.Forms.Timer();
+                desktopLoadTimer.Interval = 60000;
+                desktopLoadTimer.Tick += delegate { FailDesktopView("Agent interface did not become ready within 60 seconds."); };
+            }
+            desktopLoadTimer.Stop();
+            desktopLoadTimer.Start();
+        }
+        private void TryShowAgentSurface()
+        {
+            if (closing || !ready || !desktopNavigationReady || !desktopViewReady || desktopSurfaceShown) return;
+            desktopSurfaceShown = true;
+            if (desktopLoadTimer != null) desktopLoadTimer.Stop();
+            RecordStartupTiming("interface-view-ready");
+            CompleteStartup();
+            ShowAgentSurface();
+            ConfirmCapabilityHealth();
+            PublishDesktopState(false);
         }
         private void ShowAgentSurface()
         {
+            bootstrapFailed = false;
             startup.Visible = false;
             webView.Visible = true;
             webView.BringToFront();
@@ -1934,8 +2021,32 @@ internal static partial class MoE4All
             browserButton.Enabled = true;
         }
 
+        private void FailDesktopView(string message)
+        {
+            if (closing || IsDisposed) return;
+            if (desktopLoadTimer != null) desktopLoadTimer.Stop();
+            desktopNavigationReady = desktopViewReady = desktopSurfaceShown = false;
+            WriteMessage(message, true);
+            desktopBridgeReady = false;
+            bootstrapFailed = true;
+            preparingProgress = false;
+            journey.SetFailed();
+            progressBar.SetFailed();
+            Presentation.SetCopy(startupHeading, "桌面界面暂不可用");
+            Presentation.SetCopy(startupExplanation, "本地服务可能仍在运行。可以在浏览器继续使用，或查看日志后重新打开 Agent。");
+            Presentation.SetCopy(progressText, "请在浏览器继续或查看日志");
+            Presentation.SetCopy(progressDetail, message);
+            Presentation.SetCopy(progressPercent, "需要处理");
+            SetDetailsVisible(true);
+            ShowBootstrap();
+            startup.BringToFront();
+            browserButton.BringToFront();
+            browserButton.Enabled = true;
+        }
+
         private void OnClosing(object sender, FormClosingEventArgs e)
         {
+            if (desktopLoadTimer != null) { desktopLoadTimer.Dispose(); desktopLoadTimer = null; }
             SaveDesktopWindow();
             FinishPicker(null);
             closing = true;

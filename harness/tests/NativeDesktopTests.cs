@@ -22,6 +22,7 @@ internal static class NativeDesktopTests
             else if (area == "chrome") MoE4All.ValidateNativeChrome(Environment.CurrentDirectory);
             else if (area == "chrome-live") MoE4All.ValidateLiveChrome(Environment.CurrentDirectory);
             else if (area == "startup-flow") MoE4All.ValidateStartupFlow(Environment.CurrentDirectory);
+            else if (area == "desktop-failure") MoE4All.ValidateDesktopFailure(Environment.CurrentDirectory);
             else if (area == "picker-light") ProbeDialog("white", "directory");
             else throw new ArgumentException("Unknown native test area.");
             return 0;
@@ -144,6 +145,12 @@ internal static class NativeDesktopTests
 
 internal static partial class MoE4All
 {
+    internal static void ValidateDesktopFailure(string root)
+    {
+        using (AgentWindow window = new AgentWindow(root, false)) window.ValidateDesktopFailureForTest();
+        Console.WriteLine("Desktop failure passed: visible localized fallback, no service stop or automatic restart.");
+    }
+
     internal static void ValidateStartupFlow(string root)
     {
         string node = Environment.GetEnvironmentVariable("MOE4ALL_TEST_NODE");
@@ -197,6 +204,34 @@ internal static partial class MoE4All
 
     private sealed partial class AgentWindow
     {
+        internal void ValidateDesktopFailureForTest()
+        {
+            Show(); Application.DoEvents();
+            ready = true;
+            capabilityHealthConfirmed = true;
+            desktopNavigationReady = true;
+            TryShowAgentSurface();
+            NativeDesktopTests.Check(startup.Visible && !webView.Visible, "Navigation alone must not hide startup.");
+            desktopNavigationReady = false;
+            desktopViewReady = true;
+            TryShowAgentSurface();
+            NativeDesktopTests.Check(startup.Visible && !webView.Visible, "View mount alone must wait for navigation.");
+            desktopNavigationReady = true;
+            TryShowAgentSurface();
+            NativeDesktopTests.Check(desktopSurfaceShown && !startup.Visible && webView.Visible, "Both readiness signals must reveal the view.");
+            foreach (string language in new[] { "zh", "en" }) {
+                Presentation.Language = language;
+                ShowAgentSurface();
+                desktopBridgeReady = true;
+                FailDesktopView("fixture: ConnectionAborted");
+                NativeDesktopTests.Check(ready && !desktopBridgeReady && bootstrapFailed, "A failed view must preserve local service readiness but invalidate the desktop bridge.");
+                NativeDesktopTests.Check(startup.Visible && !webView.Visible && browserButton.Enabled, "A failed view must show the native fallback and browser action.");
+                NativeDesktopTests.Check(startupHeading.Text == Presentation.Translate("桌面界面暂不可用"), "The fallback must follow the selected language.");
+                NativeDesktopTests.Check(!progressBar.IsAnimating && job == IntPtr.Zero, "A failed view must not animate or create a backend process.");
+            }
+            Close();
+        }
+
         internal void ValidateStartupFlowForTest()
         {
             startupWatch.Start();
