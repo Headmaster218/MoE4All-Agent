@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'AgentUpdateVersion.ps1')
 $cases = @(
+    @('release-0.2.4-preview.1', 'release-0.2.1', $false),
+    @('release-0.2.4-preview.2', 'release-0.2.4-preview.1', $true),
+    @('release-0.2.4', 'release-0.2.4-preview.1', $true),
     @('release-0.2.1', 'release-0.2.0', $true),
     @('release-0.2.0', 'release-0.2.1', $false),
     @('release-0.2.1', 'release-0.2.1', $false),
@@ -28,3 +31,4 @@ foreach ($case in $cases) {
 }
 Write-Host "Agent version comparisons passed: $($cases.Count)"
 if (-not (Test-AgentVersionNewer 'release-0.2.0-preview.1' 'release-0.1.0' -IncludePrerelease)) { throw 'Explicit preview opt-in was ignored.' }
+if (-not (Test-AgentVersionNewer 'release-0.2.4-preview.1' 'release-0.2.1' -IncludePrerelease)) { throw 'The beta must be discoverable after explicit preview opt-in.' }

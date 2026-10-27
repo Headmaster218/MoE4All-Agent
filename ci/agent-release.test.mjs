@@ -22,6 +22,16 @@ test('source_tag rebuild is immutable and cannot create or move an existing tag'
   assert.throws(() => agentReleasePlan(build, { ...rebuild, sourceTag: 'release-0.2.1' }))
 })
 
+test('preview tags retain the exact prerelease version in the CI draft plan', () => {
+  const preview = { ...build, version: '0.2.4-preview.1' }
+  const plan = agentReleasePlan(preview, { ...env, event: 'push', ref: 'refs/tags/release-0.2.4-preview.1' })
+  assert.equal(plan.tag, 'release-0.2.4-preview.1')
+  assert.equal(plan.version, preview.version)
+  assert.equal(plan.draft, true)
+  assert.equal(plan.allowCreateTag, false)
+  assert.throws(() => agentReleasePlan(preview, { ...env, event: 'push', ref: 'refs/tags/release-0.2.4' }))
+})
+
 test('wrong refs, events, repositories and versions cannot prepare an Agent release', () => {
   for (const change of [{ ref: 'refs/heads/dev' }, { event: 'pull_request' }, { repository: 'other/MoE4All-Agent' },
     { event: 'push', ref: 'refs/tags/release-9.9.9' }, { event: 'push', ref: 'refs/tags/v0.2.2' }]) {
